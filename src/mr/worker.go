@@ -1,10 +1,12 @@
 package mr
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 import "log"
 import "net/rpc"
 import "hash/fnv"
-
 
 //
 // Map functions return a slice of KeyValue.
@@ -24,17 +26,29 @@ func ihash(key string) int {
 	return int(h.Sum32() & 0x7fffffff)
 }
 
-
 //
 // main/mrworker.go calls this function.
 //
+func heatBeatCall(id int64) {
+
+	for {
+		var reply int
+
+		// send the RPC request, wait for the reply.
+		call("Master.HeatBeat", &id, &reply)
+		time.Sleep(time.Second * 1)
+	}
+
+}
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
 
-	// Your worker implementation here.
+	// Your workerInfo implementation here.
 
 	// uncomment to send the Example RPC to the master.
-	// CallExample()
+	CallExample()
+	go heatBeatCall(1)
+	time.Sleep(time.Second * 100)
 
 }
 

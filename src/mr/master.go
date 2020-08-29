@@ -10,9 +10,14 @@ import "os"
 import "net/rpc"
 import "net/http"
 
+const updateCilentInteval = clientKickOutTime / 5
+const clientKickOutTime time.Duration = time.Second * 10
+
 type Master struct {
 	// Your definitions here.
 
+	files  []string
+	jsList []jobStatus
 }
 
 // Your code here -- RPC handlers for the workerInfo to call.
@@ -27,58 +32,70 @@ func (m *Master) Example(args *ExampleArgs, reply *ExampleReply) error {
 	return nil
 }
 
-func getAvailableWork() (int64, error) {
-	return 0, fmt.Errorf("error")
+// error if no available job found
+func (m *Master) FetchJob(unUsed *int, reply *JobInfo) error {
+	for i, js := range m.jsList {
+		if js.status == pending {
+			err := m.jsList[i].updateStatus(running)
+			if err == nil {
+				*reply = m.jsList[i].info
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("no more work")
 }
 
-const updateCilentInteval = clientKickOutTime / 5
-const clientKickOutTime time.Duration = time.Second * 10
+func (m *Master) jobDone(arg *JobInfo, reply *int) error {
+	*reply = 0
+	id := arg.id()
+	for _, js := range m.jsList {
+		if js.info.id() == id {
+			err := js.updateStatus(finish)
 
-type workerInfo struct {
-	lastHeatTime time.Time
-	id           int64
-}
-
-var clientStatus = make(map[int64]workerInfo)
-
-var heatBeatChan = make(chan int64, 1000)
-
-func (m *Master) HeatBeat(args *int64, reply *int) error {
-	*reply = 1
-	//log.Printf("get heat beat from %d", *args)
-	heatBeatChan <- *args
+			if err == nil {
+				if arg.JobType == mapJob {
+					m.jsList = append(m.jsList, newJobStatus(mapOutputFile(arg.InputFile[0], arg.ReduceNumber),
+						arg.ReduceNumber, reduceJob))
+					return nil
+				}
+			}
+			log.Fatalf("update job %s status to finish error", js.info.id())
+			return nil
+		}
+	}
+	log.Fatalf("job id %s not found", arg.id())
 	return nil
 }
 
+//func (m *Master) addReduceJob(file []string) {
 //
-// start a thread that listens for RPCs from workerInfo.go
-//
-func mainLoop() {
-	t := time.NewTimer(updateCilentInteval)
+//}
 
+//func getReduceName(number int) string {
+//	return "reduce_" + strconv.Itoa(number)
+//}
+
+func (m *Master) checkTimeOut() {
+	t := time.NewTimer(updateCilentInteval)
 	for {
 		select {
-		case workId := <-heatBeatChan:
-			worker, ok := clientStatus[workId]
-			if ok {
-				worker.lastHeatTime = time.Now()
-			} else {
-				worker = workerInfo{id: workId, lastHeatTime: time.Now()}
-			}
-			clientStatus[workId] = worker
-
-		//	check heathbeat
 		case <-t.C:
-			for key, v := range clientStatus {
-				if time.Now().Sub(v.lastHeatTime) > clientKickOutTime {
-					delete(clientStatus, key)
-					log.Printf("time expire, kick out %d", key)
+			for _, js := range m.jsList {
+				if js.status == running && time.Now().Sub(js.startTime) > clientKickOutTime {
+					js.updateStatus(pending)
+					log.Printf("time expire, set job to expire")
 				}
 			}
 			t = time.NewTimer(updateCilentInteval)
 		}
 	}
 }
+
+//
+// start a thread that listens for RPCs from workerInfo.go
+//
+
 func (m *Master) server() {
 	rpc.Register(m)
 	rpc.HandleHTTP()
@@ -90,7 +107,7 @@ func (m *Master) server() {
 		log.Fatal("listen error:", e)
 	}
 	go http.Serve(l, nil)
-	go mainLoop()
+	go m.checkTimeOut()
 }
 
 //
@@ -98,7 +115,13 @@ func (m *Master) server() {
 // if the entire job has finished.
 //
 func (m *Master) Done() bool {
-	ret := false
+	ret := true
+	for _, js := range m.jsList {
+		if js.status != finish {
+			ret = false
+			break
+		}
+	}
 
 	// Your code here.
 
@@ -111,7 +134,13 @@ func (m *Master) Done() bool {
 // nReduce is the number of reduce tasks to use.
 //
 func MakeMaster(files []string, nReduce int) *Master {
-	m := Master{}
+	//var reduceFils []string
+	var jsList []jobStatus
+	for _, i := range files {
+		jsList = append(jsList, newJobStatus([]string{i}, nReduce, mapJob))
+	}
+	fmt.Printf("%+v", jsList)
+	m := Master{files, jsList}
 
 	// Your code here.
 

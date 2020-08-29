@@ -29,15 +29,29 @@ func ihash(key string) int {
 //
 // main/mrworker.go calls this function.
 //
-func heatBeatCall(id int64) {
-
-	for {
-		var reply int
-
-		// send the RPC request, wait for the reply.
-		call("Master.HeatBeat", &id, &reply)
-		time.Sleep(time.Second * 1)
+//func heatBeatCall(id int64) {
+//
+//	for {
+//		var reply int
+//		fmt.Printf("test")
+//
+//		send the RPC request, wait for the reply.
+//call("Master.HeatBeat", &id, &reply)
+//time.Sleep(time.Second * 1)
+//}
+//
+//}
+func callFetchJob() (JobInfo, error) {
+	arg := 0
+	reply := JobInfo{}
+	res := call("Master.FetchJob", &arg, &reply)
+	if !res {
+		return reply, fmt.Errorf("fetch job fail")
 	}
+	return reply, nil
+}
+
+func callJobDone(info JobInfo) {
 
 }
 func Worker(mapf func(string, string) []KeyValue,
@@ -46,17 +60,66 @@ func Worker(mapf func(string, string) []KeyValue,
 	// Your workerInfo implementation here.
 
 	// uncomment to send the Example RPC to the master.
-	CallExample()
-	go heatBeatCall(1)
-	time.Sleep(time.Second * 100)
+	//CallExample()
+	for {
+		ji, error := callFetchJob()
+		if error != nil {
+			log.Print(error)
+			time.Sleep(time.Second * 3)
+			continue
+		}
+		log.Printf("get file %s", ji.InputFile)
+		if ji.JobType == mapJob {
+			//doMapJob(ji, mapf)
+
+		} else {
+			//	todo
+			//callJobDone()
+		}
+	}
 
 }
+
+//func doMapJob(ji JobInfo, mapf func(string, string) []KeyValue) {
+//	filename := ji.InputFile[0]
+//	file, err := os.Open(filename)
+//	if err != nil {
+//		log.Fatalf("cannot open %v", filename)
+//	}
+//	content, err := ioutil.ReadAll(file)
+//	if err != nil {
+//		log.Fatalf("cannot read %v", filename)
+//	}
+//	file.Close()
+//	kva := mapf(filename, string(content))
+//	var reduceBuffer [ji.ReduceNumber][]KeyValue
+//	for _, kv := range kva {
+//		number := ihash(kv.Key)
+//		reduceBuffer[number] = append(reduceBuffer[number], kv)
+//	}
+//	outputFiles := mapOutputFile(ji.InputFile[0], ji.ReduceNumber)
+//	for i, fileName := range outputFiles {
+//		file, err := os.Create(fileName)
+//		if err != nil {
+//			log.Fatalf("cannot open %v", filename)
+//		}
+//		file.WriteString()
+//
+//	}
+//
+//	//todo
+//	callJobDone()
+//}
 
 //
 // example function to show how to make an RPC call to the master.
 //
 // the RPC argument and reply types are defined in rpc.go.
 //
+
+func fetchJob() {
+
+}
 func CallExample() {
 
 	// declare an argument structure.

@@ -54,7 +54,7 @@ func unmarshalFromFile(fileName string) []KeyValue {
 
 func findReduceInputFile(dir string, id int) []string {
 	var res []string
-	files, err := ioutil.ReadDir("/Users/wn/code/6.824-golabs-2020/src/main")
+	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		log.Fatal(err)
 	}

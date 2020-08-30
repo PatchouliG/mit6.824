@@ -1,7 +1,7 @@
 package mr
 
 import (
-	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -22,20 +22,25 @@ type jobStatus struct {
 	mux       sync.Mutex
 }
 
-func newJobStatus(files []string, reduceNumber int, jobType string) jobStatus {
-	return jobStatus{JobInfo{
-		jobType, files, reduceNumber,
-	}, pending, time.Now(), sync.Mutex{}}
+func newMapJobStatus(files string, reduceNumber int) jobStatus {
+	jobinfo := newMapJobInfo(files, reduceNumber)
+	return jobStatus{jobinfo, pending, time.Now(), sync.Mutex{}}
+}
+func newReduceJobStatus(reduceNumber int) jobStatus {
+	jobinfo := newReduceJobInfo(reduceNumber)
+	return jobStatus{jobinfo, pending, time.Now(), sync.Mutex{}}
 }
 
-func (js *jobStatus) updateStatus(status int) error {
+func (js *jobStatus) updateStatus(status int) {
 	js.mux.Lock()
 	defer js.mux.Unlock()
 
 	if status-js.status == 1 || (js.status == running && status == pending) {
 		js.status = status
-		return nil
+		if status == running {
+			js.startTime = time.Now()
+		}
+	} else {
+		log.Fatalf("update %s status error, from %d to %d", js.info.id(), js.status, status)
 	}
-	return fmt.Errorf("status update fail, from %d to %d",
-		status, js.status)
 }

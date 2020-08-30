@@ -16,8 +16,11 @@ const clientKickOutTime time.Duration = time.Second * 10
 type Master struct {
 	// Your definitions here.
 
-	files  []string
-	jsList []jobStatus
+	files            []string
+	jsList           []jobStatus
+	finishedMapCount int
+	mapJobNumber     int
+	reduceNumber     int
 }
 
 // Your code here -- RPC handlers for the workerInfo to call.
@@ -36,31 +39,32 @@ func (m *Master) Example(args *ExampleArgs, reply *ExampleReply) error {
 func (m *Master) FetchJob(unUsed *int, reply *JobInfo) error {
 	for i, js := range m.jsList {
 		if js.status == pending {
-			err := m.jsList[i].updateStatus(running)
-			if err == nil {
-				*reply = m.jsList[i].info
-				return nil
-			}
+			m.jsList[i].updateStatus(running)
+			*reply = m.jsList[i].info
+			log.Printf("send job %s", m.jsList[i].info.id())
+			return nil
 		}
 	}
 	return fmt.Errorf("no more work")
 }
 
-func (m *Master) jobDone(arg *JobInfo, reply *int) error {
+func (m *Master) JobDone(arg *JobInfo, reply *int) error {
 	*reply = 0
 	id := arg.id()
-	for _, js := range m.jsList {
+	log.Printf("rececive job done %s,job type %s", arg.id(), arg.JobType)
+	for i, js := range m.jsList {
 		if js.info.id() == id {
-			err := js.updateStatus(finish)
-
-			if err == nil {
-				if arg.JobType == mapJob {
-					m.jsList = append(m.jsList, newJobStatus(mapOutputFile(arg.InputFile[0], arg.ReduceNumber),
-						arg.ReduceNumber, reduceJob))
-					return nil
+			m.jsList[i].updateStatus(finish)
+			if arg.JobType == mapJob {
+				m.finishedMapCount += 1
+				if m.finishedMapCount < m.mapJobNumber {
+				} else {
+					log.Printf("all map job is finishd")
+					for i := 0; i < m.reduceNumber; i++ {
+						m.jsList = append(m.jsList, newReduceJobStatus(i))
+					}
 				}
 			}
-			log.Fatalf("update job %s status to finish error", js.info.id())
 			return nil
 		}
 	}
@@ -81,10 +85,10 @@ func (m *Master) checkTimeOut() {
 	for {
 		select {
 		case <-t.C:
-			for _, js := range m.jsList {
+			for i, js := range m.jsList {
 				if js.status == running && time.Now().Sub(js.startTime) > clientKickOutTime {
-					js.updateStatus(pending)
-					log.Printf("time expire, set job to expire")
+					m.jsList[i].updateStatus(pending)
+					log.Printf("time expire, set job %s to expire", js.info.id())
 				}
 			}
 			t = time.NewTimer(updateCilentInteval)
@@ -136,11 +140,13 @@ func (m *Master) Done() bool {
 func MakeMaster(files []string, nReduce int) *Master {
 	//var reduceFils []string
 	var jsList []jobStatus
-	for _, i := range files {
-		jsList = append(jsList, newJobStatus([]string{i}, nReduce, mapJob))
+	for _, file := range files {
+		log.Printf(file)
+		jsList = append(jsList, newMapJobStatus(file, nReduce))
 	}
-	fmt.Printf("%+v", jsList)
-	m := Master{files, jsList}
+	a, _ := os.Getwd()
+	fmt.Printf("debug cwd is %s", a)
+	m := Master{files, jsList, 0, len(jsList), nReduce}
 
 	// Your code here.
 

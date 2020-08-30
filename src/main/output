@@ -1,0 +1,70 @@
+*** Starting wc test.
+debug cwd is /Users/wn/code/6.824-golabs-2020/src/main/mr-tmpno more work
+no more work
+no more work
+--- wc test: PASS
+*** Starting indexer test.
+debug cwd is /Users/wn/code/6.824-golabs-2020/src/main/mr-tmpno more work
+no more work
+mr-indexer-all mr-correct-indexer.txt differ: char 5, line 1
+--- indexer output is not the same as mr-correct-indexer.txt
+--- indexer test: FAIL
+*** Starting map parallelism test.
+debug cwd is /Users/wn/code/6.824-golabs-2020/src/main/mr-tmpno more work
+no more work
+--- map parallelism test: PASS
+*** Starting reduce parallelism test.
+debug cwd is /Users/wn/code/6.824-golabs-2020/src/main/mr-tmpno more work
+no more work
+no more work
+--- reduce parallelism test: PASS
+*** Starting crash test.
+debug cwd is /Users/wn/code/6.824-golabs-2020/src/main/mr-tmpno more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+no more work
+mr-crash-all mr-correct-crash.txt differ: char 3, line 1
+--- crash output is not the same as mr-correct-crash.txt
+--- crash test: FAIL
+*** FAILED SOME TESTS

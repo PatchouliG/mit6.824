@@ -13,7 +13,7 @@ import (
 )
 
 func marshalToFile(absFile string, objects []KeyValue) {
-	_,fileName := filepath.Split(absFile)
+	_, fileName := filepath.Split(absFile)
 	cw, _ := os.Getwd()
 
 	file, error := os.Create(path.Join(cw, fileName))

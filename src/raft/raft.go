@@ -7,25 +7,30 @@ package raft
 //
 // rf = Make(...)
 //   create a new Raft server.
-// rf.Start(command interface{}) (index, term, isleader)
+// rf.Start(command interface{}) (index, Term, isleader)
 //   start agreement on a new log entry
-// rf.GetState() (term, isLeader)
-//   ask a Raft for its current term, and whether it thinks it is leader
+// rf.GetState() (Term, isLeader)
+//   ask a Raft for its current Term, and whether it thinks it is leader
 // ApplyMsg
 //   each time a new entry is committed to the log, each Raft peer
 //   should send an ApplyMsg to the service (or tester)
 //   in the same server.
 //
 
-import "sync"
+import (
+	"../labgob"
+	"../labrpc"
+	"bytes"
+	"sync"
+	"time"
+)
 import "sync/atomic"
-import "../labrpc"
 
 // import "bytes"
 // import "../labgob"
 
 //
-// as each Raft peer becomes aware that successive log entries are
+// as each Raft peer becomes aware that successive log Entries are
 // committed, the peer should send an ApplyMsg to the service (or
 // tester) on the same server, via the applyCh passed to Make(). set
 // CommandValid to true to indicate that the ApplyMsg contains a newly
@@ -41,9 +46,22 @@ type ApplyMsg struct {
 	CommandIndex int
 }
 
+// todo value
+var electionTimeout = time.Duration(time.Second * 100)
+
+// todo value
+var HeatBeatTimeout = time.Duration(time.Second)
+
+const (
+	leader    = "leader"
+	follower  = "follower"
+	candidate = "cadidate"
+)
+
 //
 // A Go object implementing a single Raft peer.
 //
+
 type Raft struct {
 	mu        sync.Mutex          // Lock to protect shared access to this peer's state
 	peers     []*labrpc.ClientEnd // RPC end points of all peers
@@ -54,6 +72,23 @@ type Raft struct {
 	// Your data here (2A, 2B, 2C).
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
+	status              Status
+	lastAppendEntryTime time.Time
+	peerStatusMap       map[int]PeerStatus
+	appendEntryIn       chan AppendEntryArgs
+	appendEntryout      chan AppendEntryReply
+	voteReply           chan RequestVoteReply
+	voteArgs            chan RequestVoteArgs
+	startInput          chan Command
+	// todo
+	//startOutput         chan struct {
+	//	a int
+	//	b int
+	//	c bool
+	//}
+}
+
+func (rf *Raft) serverRoutine() {
 
 }
 
@@ -81,6 +116,11 @@ func (rf *Raft) persist() {
 	// e.Encode(rf.yyy)
 	// data := w.Bytes()
 	// rf.persister.SaveRaftState(data)
+	w := new(bytes.Buffer)
+	e := labgob.NewEncoder(w)
+	e.Encode(rf.status)
+	data := w.Bytes()
+	rf.persister.SaveRaftState(data)
 }
 
 //
@@ -110,6 +150,9 @@ func (rf *Raft) readPersist(data []byte) {
 // field names must start with capital letters!
 //
 type RequestVoteArgs struct {
+	term      Term
+	lastIndex Index
+	id        int
 	// Your data here (2A, 2B).
 }
 
@@ -118,6 +161,7 @@ type RequestVoteArgs struct {
 // field names must start with capital letters!
 //
 type RequestVoteReply struct {
+	ok bool
 	// Your data here (2A).
 }
 
@@ -126,6 +170,22 @@ type RequestVoteReply struct {
 //
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
+	rf.voteArgs <- *args
+	*reply = <-rf.voteReply
+}
+
+type AppendEntryArgs struct {
+	PreviousEntryIndex Index
+	PreviousEntryTerm  Term
+	Entries            []Entry
+	Term               Term
+}
+type AppendEntryReply struct {
+	Ok bool
+}
+
+func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
+
 }
 
 //
@@ -173,7 +233,7 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 //
 // the first return value is the index that the command will appear at
 // if it's ever committed. the second return value is the current
-// term. the third return value is true if this server believes it is
+// Term. the third return value is true if this server believes it is
 // the leader.
 //
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
@@ -224,6 +284,14 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.peers = peers
 	rf.persister = persister
 	rf.me = me
+	rf.status = NewStatus()
+	rf.lastAppendEntryTime = time.Now()
+	rf.appendEntryIn = make(chan AppendEntryArgs)
+	rf.appendEntryout = make(chan AppendEntryReply)
+	rf.voteReply = make(chan RequestVoteReply)
+	rf.voteArgs = make(chan RequestVoteArgs)
+	rf.peerStatusMap = make(map[int]PeerStatus)
+	rf.startInput=make(chan Command)
 
 	// Your initialization code here (2A, 2B, 2C).
 

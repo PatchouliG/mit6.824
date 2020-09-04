@@ -107,7 +107,7 @@ func doReduceJob(ji JobInfo, reducef func(string, []string) string) {
 	reduceId := ji.ReduceId
 	log.Printf("reduce %d begin", reduceId)
 	files := findReduceInputFile(".", reduceId)
-	log.Printf("shuffle files %s",files)
+	log.Printf("shuffle files %s", files)
 	shuffleResult := shuffle(files)
 	ofile, error := os.Create(reduceOutputFile(reduceId))
 	defer ofile.Close()

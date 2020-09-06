@@ -9,7 +9,10 @@ go test -run 2A # run test 2A
 ```
 
 ## lab 2A
-lab 2a git tag （todo)
+
+### goal
+
+实现选举
 
 实现上，除了选举外，由于心跳机制需要实现append entry，
 只是只完成了log的replication，不负责committee，apply之类的逻辑
@@ -23,6 +26,17 @@ lab 2a git tag （todo)
 
 ## lab 2B
 
-todo 增加选举限制
+### goal
+
+Implement the leader and follower code to append new log entries, so that the go test -run 2B tests pass.
+
+
+### todo
+在vote和append request的回复中,增加current term，当leader和candidate发现自己的term落后，直接变成follower
+
+增加选举限制 （done）
+committee 机制
+对start 的支持
+
 
 

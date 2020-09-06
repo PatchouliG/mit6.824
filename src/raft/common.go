@@ -68,6 +68,21 @@ func (rf *Raft) handleVote(voteArgs RequestVoteArgs) (reply RequestVoteReply) {
 		return
 	}
 
+	// compare latest entry
+	lastSlotIndex := len(rf.status.Log) - 1
+	lastSlotTerm := rf.status.Log[lastSlotIndex].Term
+	if lastSlotTerm > voteArgs.LastSlotTerm {
+		log.Printf("%d last slot term %d is later than vote's term %d,reject vote",
+			rf.me, lastSlotTerm, voteArgs.LastSlotTerm)
+		reply.Ok = false
+		return
+	} else if lastSlotTerm == voteArgs.LastSlotTerm {
+		if lastSlotIndex > int(voteArgs.LastSlotIndex) {
+			reply.Ok = false
+			return
+		}
+	}
+
 	// update current
 	log.Printf("%d update current CurrentTerm from %d to %d for vote", rf.me, rf.status.CurrentTerm, voteArgs.Term)
 	rf.status.CurrentTerm = voteArgs.Term

@@ -172,9 +172,10 @@ func (rf *Raft) readPersist(data []byte) {
 // field names must start with capital letters!
 //
 type RequestVoteArgs struct {
-	Term      Term
-	LastIndex Index
-	Id        int
+	Term          Term
+	LastSlotIndex Index
+	LastSlotTerm  Term
+	Id            int
 	// Your data here (2A, 2B).
 }
 

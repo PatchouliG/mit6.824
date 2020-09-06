@@ -55,7 +55,10 @@ func (rf *Raft) candidateHandelTimeout(successChan chan int) {
 
 func (rf *Raft) sendVoteRequest(successChan chan int) {
 	log.Printf("%d candidate time out, begin CurrentTerm %d election", rf.me, rf.status.CurrentTerm)
-	voteArgs := RequestVoteArgs{rf.status.CurrentTerm, Index(len(rf.status.Log) - 1), rf.me}
+	voteArgs := RequestVoteArgs{rf.status.CurrentTerm,
+		Index(len(rf.status.Log) - 1),
+		rf.status.Log[len(rf.status.Log)-1].Term,
+		rf.me}
 	for id, _ := range rf.peers {
 		if id == rf.me {
 			continue

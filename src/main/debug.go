@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type P struct {
 	X, Y, Z int
@@ -17,9 +20,17 @@ type A interface {
 
 type Test int
 
-func main() {
-	var a Test
-	a = 3
-	fmt.Println(int(a) == 4)
+func test(ouput chan int) {
+	time.Sleep(time.Second * 5)
+	ouput <- 1
+	fmt.Printf("ok")
+}
 
+func main() {
+	for i := 1; i < 10; i++ {
+		go func() {
+			fmt.Print(i)
+		}()
+	}
+	time.Sleep(time.Second)
 }

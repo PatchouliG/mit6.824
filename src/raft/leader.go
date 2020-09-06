@@ -42,13 +42,13 @@ func (rf *Raft) leaderRoutine() string {
 			res := rf.handleAppend(&appendEntryArgs)
 			rf.appendEntryReply <- res
 			if res.Result != appendEntryStaleTerm {
-				log.Printf("leader %d accept a append request ,trun to follower", rf.me)
+				log.Printf("leader %d accept a append request ,turn to follower", rf.me)
 				return follower
 			}
 		case voteArgs := <-rf.voteRequestChan:
 			voteReply := rf.handleVote(voteArgs)
 			rf.voteReplyChan <- voteReply
-			if voteReply.Ok {
+			if voteReply.Result == voteReplySuccess {
 				log.Printf("leader %d accept a vote from %d, turn to follower",
 					rf.me, voteArgs.Id)
 				return follower

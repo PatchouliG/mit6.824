@@ -8,6 +8,8 @@ go test  # run all test
 go test -run 2A # run test 2A
 ```
 
+注意多测几次，fail可能会随机出现
+
 ## lab 2A
 
 ### goal
@@ -32,7 +34,7 @@ Implement the leader and follower code to append new log entries, so that the go
 
 
 ### todo
-在vote和append request的回复中,增加current term，当leader和candidate发现自己的term落后，直接变成follower
+在vote和append request的回复中,增加current term，当leader和candidate发现自己的term落后，直接变成follower(done)
 
 增加选举限制 （done）
 committee 机制

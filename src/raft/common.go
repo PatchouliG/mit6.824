@@ -58,13 +58,7 @@ func (rf *Raft) handleVote(voteArgs RequestVoteArgs) (reply RequestVoteReply) {
 	if voteArgs.Term <= rf.status.CurrentTerm {
 		log.Printf("%d receive request from an old CurrentTerm, current term is %d, reply term is %d, refuse it",
 			rf.me, rf.status.CurrentTerm, voteArgs.Term)
-		reply.Ok = false
-		return
-	}
-
-	if _, ok := rf.status.VoteFor[voteArgs.Term]; ok {
-		log.Printf("%d CurrentTerm %d is already vote", rf.me, voteArgs.Term)
-		reply.Ok = false
+		reply.Result = voteReplyStaleTerm
 		return
 	}
 
@@ -74,13 +68,19 @@ func (rf *Raft) handleVote(voteArgs RequestVoteArgs) (reply RequestVoteReply) {
 	if lastSlotTerm > voteArgs.LastSlotTerm {
 		log.Printf("%d last slot term %d is later than vote's term %d,reject vote",
 			rf.me, lastSlotTerm, voteArgs.LastSlotTerm)
-		reply.Ok = false
+		reply.Result = voteReplyStaleTerm
 		return
 	} else if lastSlotTerm == voteArgs.LastSlotTerm {
 		if lastSlotIndex > int(voteArgs.LastSlotIndex) {
-			reply.Ok = false
+			reply.Result = voteReplyStaleTerm
 			return
 		}
+	}
+
+	if _, ok := rf.status.VoteFor[voteArgs.Term]; ok {
+		log.Printf("%d CurrentTerm %d is already vote", rf.me, voteArgs.Term)
+		reply.Result = voteReplyApplyAlreadyVote
+		return
 	}
 
 	// update current
@@ -91,6 +91,6 @@ func (rf *Raft) handleVote(voteArgs RequestVoteArgs) (reply RequestVoteReply) {
 
 	rf.status.VoteFor[voteArgs.Term] = voteArgs.Id
 	rf.persist()
-	reply.Ok = true
+	reply.Result = voteReplySuccess
 	return
 }

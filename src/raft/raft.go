@@ -52,9 +52,9 @@ type ApplyMsg struct {
 var electionTimeout = time.Duration(time.Millisecond * 500)
 
 func (rf *Raft) randomElectionTimeout() time.Duration {
-	rand.Seed(int64(rf.me + int(rf.status.CurrentTerm)))
+	rand.Seed(int64(rf.me + int(rf.status.CurrentTerm)+int(rf.lastAppendEntryTime.Nanosecond())))
 
-	res := time.Duration(int64(float64(electionTimeout)*rand.Float64() + 3*rand.Float64()*float64(electionTimeout)))
+	res := time.Duration(int64(float64(electionTimeout)*rand.Float64() + 6*rand.Float64()*float64(electionTimeout)))
 	return res
 
 }
@@ -179,12 +179,18 @@ type RequestVoteArgs struct {
 	// Your data here (2A, 2B).
 }
 
+const (
+	voteReplySuccess          = "voteReplySuccess"
+	voteReplyApplyAlreadyVote = "voteReplyApplyAlreadyVote"
+	voteReplyStaleTerm        = "voteReplyStaleTerm"
+)
+
 //
 // example RequestVote RPC reply structure.
 // field names must start with capital letters!
 //
 type RequestVoteReply struct {
-	Ok bool
+	Result string
 	// Your data here (2A).
 }
 

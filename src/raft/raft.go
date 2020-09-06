@@ -49,18 +49,21 @@ type ApplyMsg struct {
 }
 
 // todo value
-var electionTimeout = time.Duration(time.Millisecond * 500)
+var electionTimeout = time.Duration(time.Millisecond * 200)
 
 func (rf *Raft) randomElectionTimeout() time.Duration {
-	rand.Seed(int64(rf.me + int(rf.status.CurrentTerm)+int(rf.lastAppendEntryTime.Nanosecond())))
+	seed := int64((rf.me + 7) * 65535 * int(rf.status.CurrentTerm+17) * 255)
+	rand.Seed(seed)
+	//log.Printf("debug %d rand seed is %d", rf.me, seed)
 
-	res := time.Duration(int64(float64(electionTimeout)*rand.Float64() + 6*rand.Float64()*float64(electionTimeout)))
+	res := time.Duration(int64(float64(electionTimeout) + (rand.Float64() * float64(time.Duration(time.Millisecond*300)))))
+	//log.Printf("debug %d timeout is %d", rf.me, res)
 	return res
 
 }
 
 // todo value
-var HeatBeatTimeout = time.Duration(time.Millisecond * 200)
+var HeatBeatTimeout = time.Duration(time.Millisecond * 120)
 
 var timeoutCheck = time.Duration(time.Millisecond * 20)
 
@@ -86,6 +89,7 @@ type Raft struct {
 	// state a Raft server must maintain.
 
 	// all data need persist
+	applyMsgChan        chan ApplyMsg
 	status              Status
 	lastAppendEntryTime time.Time
 	peerStatusMap       map[int]PeerStatus
@@ -93,18 +97,17 @@ type Raft struct {
 	appendEntryReply    chan AppendEntryReply
 	voteReplyChan       chan RequestVoteReply
 	voteRequestChan     chan RequestVoteArgs
-	startInput          chan Command
+	startRequestChan    chan Command
 	// todo
-	//startOutput         chan struct {
-	//	a int
-	//	b int
-	//	c bool
-	//}
+	startReplyChan chan StartReply
 
 	followersInfo map[int]FollowerInfo
 
 	// just for lab test
-	isLeader bool
+	isLeader       bool
+	committeeIndex Index
+	lastApply      Index
+	nextApplyIndex int
 }
 
 func (rf *Raft) serverRoutine() {
@@ -180,17 +183,19 @@ type RequestVoteArgs struct {
 }
 
 const (
-	voteReplySuccess          = "voteReplySuccess"
-	voteReplyApplyAlreadyVote = "voteReplyApplyAlreadyVote"
-	voteReplyStaleTerm        = "voteReplyStaleTerm"
+	voteReplySuccess                       = "voteReplySuccess"
+	voteReplyApplyAlreadyVote              = "voteReplyApplyAlreadyVote"
+	voteReplyStaleTerm                     = "voteReplyStaleTerm"
+	voteReplyLatestLogEntryIsNotUpdateToMe = "voteReplyLatestLogEntryIsNotUpdateToMe"
 )
 
 //
-// example RequestVote RPC reply structure.
+// example RequestVote RPC Reply structure.
 // field names must start with capital letters!
 //
 type RequestVoteReply struct {
-	Result string
+	Result      string
+	CurrentTerm Term
 	// Your data here (2A).
 }
 
@@ -199,6 +204,7 @@ type AppendEntryArgs struct {
 	PreviousEntryTerm  Term
 	Entries            []Entry
 	CurrentTerm        Term
+	LeaderCommittee    Index
 }
 
 const (
@@ -211,6 +217,13 @@ type AppendEntryResult int
 
 type AppendEntryReply struct {
 	Result AppendEntryResult
+	Term   Term
+}
+
+type AppendEntryInfo struct {
+	Id    int
+	Args  AppendEntryArgs
+	Reply AppendEntryReply
 }
 
 func (rf *Raft) sendAppendEntry(server int, args *AppendEntryArgs, reply *AppendEntryReply) bool {
@@ -226,20 +239,20 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 //
 // example code to send a RequestVote RPC to a server.
 // server is the index of the target server in rf.peers[].
-// expects RPC arguments in args.
-// fills in *reply with RPC reply, so caller should
-// pass &reply.
-// the types of the args and reply passed to Call() must be
+// expects RPC arguments in Args.
+// fills in *Reply with RPC Reply, so caller should
+// pass &Reply.
+// the types of the Args and Reply passed to Call() must be
 // the same as the types of the arguments declared in the
 // handler function (including whether they are pointers).
 //
 // The labrpc package simulates a lossy network, in which servers
 // may be unreachable, and in which requests and replies may be lost.
-// Call() sends a request and waits for a reply. If a reply arrives
+// Call() sends a request and waits for a Reply. If a Reply arrives
 // within a timeout interval, Call() returns true; otherwise
 // Call() returns false. Thus Call() may not return for a while.
 // A false return can be caused by a dead server, a live server that
-// can't be reached, a lost request, or a lost reply.
+// can't be reached, a lost request, or a lost Reply.
 //
 // Call() is guaranteed to return (perhaps after a delay) *except* if the
 // handler function on the server side does not return.  Thus there
@@ -249,7 +262,7 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 //
 // if you're having trouble getting RPC to work, check that you've
 // capitalized all field names in structs passed over RPC, and
-// that the caller passes the address of the reply struct with &, not
+// that the caller passes the address of the Reply struct with &, not
 // the struct itself.
 //
 func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *RequestVoteReply) bool {
@@ -285,9 +298,17 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	term := -1
 	isLeader := true
 
-	// Your code here (2B).
+	if !rf.isLeader {
+		isLeader = false
+		return index, term, isLeader
+	}
 
-	return index, term, isLeader
+	// Your code here (2B).
+	rf.startRequestChan <- Command{command}
+	reply := <-rf.startReplyChan
+	log.Printf("%d receive start command, return term %d ,index %d", rf.me, reply.Term, reply.Index)
+
+	return reply.Index, reply.Term, isLeader
 }
 
 //
@@ -337,8 +358,12 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.voteReplyChan = make(chan RequestVoteReply)
 	rf.voteRequestChan = make(chan RequestVoteArgs)
 	rf.peerStatusMap = make(map[int]PeerStatus)
-	rf.startInput = make(chan Command)
+	rf.startRequestChan = make(chan Command)
+	rf.startReplyChan = make(chan StartReply)
 	rf.isLeader = false
+	rf.committeeIndex = 0
+	rf.lastApply = 0
+	rf.applyMsgChan = applyCh
 
 	// Your initialization code here (2A, 2B, 2C).
 

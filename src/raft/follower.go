@@ -27,7 +27,7 @@ func (rf *Raft) followerRoutine() string {
 func (rf *Raft) followerCheckTimeout() bool {
 
 	if time.Now().Sub(rf.lastAppendEntryTime) > rf.randomElectionTimeout() {
-		log.Printf("%d timeout, begin election,current term is %d", rf.me, rf.status.CurrentTerm)
+		log.Printf("%d timeout, begin election,current CurrentTerm is %d", rf.me, rf.status.CurrentTerm)
 		return true
 	}
 	return false

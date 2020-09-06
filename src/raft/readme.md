@@ -37,7 +37,12 @@ Implement the leader and follower code to append new log entries, so that the go
 在vote和append request的回复中,增加current term，当leader和candidate发现自己的term落后，直接变成follower(done)
 
 增加选举限制 （done）
+
 committee 机制
+leader 的committee
+follow的committee
+
+
 对start 的支持
 
 

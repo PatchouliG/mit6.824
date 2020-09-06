@@ -18,7 +18,9 @@ type Q struct {
 type A interface {
 }
 
-type Test int
+type Test struct {
+	i int
+}
 
 func test(ouput chan int) {
 	time.Sleep(time.Second * 5)
@@ -27,10 +29,7 @@ func test(ouput chan int) {
 }
 
 func main() {
-	for i := 1; i < 10; i++ {
-		go func() {
-			fmt.Print(i)
-		}()
-	}
-	time.Sleep(time.Second)
+	fmt.Println(time.Now().Nanosecond())
+	fmt.Println(time.Now().Nanosecond())
+	fmt.Println(time.Now().Nanosecond())
 }

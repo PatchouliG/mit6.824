@@ -11,6 +11,8 @@ func (rf *Raft) candidateRoutine() string {
 	rf.status.VoteFor[rf.status.CurrentTerm] = rf.me
 	rf.persist()
 
+	//log.Printf("%d debug inc term %d", rf.me, rf.status.CurrentTerm)
+
 	voteSuccesfulChan := make(chan RequestVoteReply, 1000)
 	voteSuccessfulCount := 0
 	rf.sendVoteRequest(voteSuccesfulChan)
@@ -40,8 +42,11 @@ func (rf *Raft) candidateRoutine() string {
 				}
 			case voteReplyApplyAlreadyVote:
 				continue
+			case voteReplyLatestLogEntryIsNotUpdateToMe:
+				continue
 			case voteReplyStaleTerm:
-				log.Printf("%d receive stale term when request vote, turn to follower", rf.me)
+				log.Printf("%d receive stale CurrentTerm when request vote, turn to follower", rf.me)
+				rf.status.CurrentTerm = voteReply.CurrentTerm
 				return follower
 			}
 
@@ -78,4 +83,5 @@ func (rf *Raft) sendVoteRequest(successChan chan RequestVoteReply) {
 			successChan <- voteReply
 		}(id)
 	}
+	//log.Printf("debug %d send vote end,current term is %d", rf.me, rf.status.CurrentTerm)
 }

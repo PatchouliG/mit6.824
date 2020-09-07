@@ -7,6 +7,7 @@ import (
 
 func (rf *Raft) followerRoutine() string {
 	for {
+		timer := time.NewTimer(timeoutCheck)
 		select {
 		case appendEntryArgs := <-rf.appendEntryRequest:
 			res := rf.handleAppend(&appendEntryArgs)
@@ -14,7 +15,7 @@ func (rf *Raft) followerRoutine() string {
 		case voteArgs := <-rf.voteRequestChan:
 			res := rf.handleVote(voteArgs)
 			rf.voteReplyChan <- res
-		case <-time.After(timeoutCheck):
+		case <-timer.C:
 			nextRole := rf.followerCheckTimeout()
 			if nextRole {
 				return candidate

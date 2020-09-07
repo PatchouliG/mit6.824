@@ -27,7 +27,19 @@ func (rf *Raft) leaderRoutine() string {
 	rf.followersInfo = followerInfos
 	rf.LeaderSyncLog(appendReplyChan)
 
+	// find latest committee command
+	rf.nextCommandIndex = 1
+	for i := len(rf.status.Log) - 1; i >= 0; i-- {
+		//for _, entry := range rf.status.Log {
+		entry := rf.status.Log[i]
+		if !entry.IsHeatBeat {
+			rf.nextCommandIndex = entry.Index + 1
+			break
+		}
+	}
+
 	for {
+		timer := time.NewTimer(rf.randomElectionTimeout())
 		select {
 		// todo client Command
 		//case
@@ -47,9 +59,11 @@ func (rf *Raft) leaderRoutine() string {
 		case voteArgs := <-rf.voteRequestChan:
 			voteReply := rf.handleVote(voteArgs)
 			rf.voteReplyChan <- voteReply
-			if voteReply.Result == voteReplySuccess {
-				log.Printf("leader %d accept a vote from %d, turn to follower",
+
+			if voteArgs.Term > rf.status.CurrentTerm {
+				log.Printf("leader %d receive a vote from %d, turn to follower",
 					rf.me, voteArgs.Id)
+				rf.status.CurrentTerm = voteArgs.Term
 				return follower
 			}
 
@@ -68,22 +82,23 @@ func (rf *Raft) leaderRoutine() string {
 				rf.LeaderSyncCommittedIndex()
 			case appendEntryNotMatch:
 				followerInfo := rf.followersInfo[id]
-				followerInfo.NextIndex--
-				if followerInfo.NextIndex < 0 {
-					log.Fatalf("error ")
+				followerInfo.NextIndex -= appendConflictDecreaseNumber
+				if followerInfo.NextIndex < 1 {
+					followerInfo.NextIndex = 1
 				}
 				rf.followersInfo[id] = followerInfo
 			}
 
 		case command := <-rf.startRequestChan:
 			log.Printf("debug comand log index is %d", len(rf.status.Log)-1)
-			entry := Entry{rf.status.CurrentTerm, false, command, rf.status.NextIndex}
+			entry := Entry{rf.status.CurrentTerm, false, command, rf.nextCommandIndex}
+			rf.nextCommandIndex++
 			rf.status.Log = append(rf.status.Log, entry)
-			rf.status.NextIndex++
+			//rf.status.lastCommitteeIndex++
 			rf.LeaderSyncLog(appendReplyChan)
 			rf.startReplyChan <- StartReply{int(entry.Index), int(rf.status.CurrentTerm)}
 
-		case <-time.After(HeatBeatTimeout):
+		case <-timer.C:
 			rf.LeaderAppendHeatBeat()
 			log.Printf("%d send heart beat after time interval", rf.me)
 			rf.LeaderSyncLog(appendReplyChan)
@@ -113,7 +128,7 @@ func (rf *Raft) LeaderSyncCommittedIndex() {
 				continue
 			}
 			applyMsg := ApplyMsg{true, entry.Command.Content, int(entry.Index)}
-			log.Printf("%d apply msg %v", rf.me, applyMsg)
+			log.Printf("%d leader apply msg %v", rf.me, applyMsg)
 			rf.applyMsgChan <- applyMsg
 			rf.nextApplyIndex++
 		}

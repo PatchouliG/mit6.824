@@ -103,8 +103,8 @@ func (rf *Raft) handleVote(voteArgs RequestVoteArgs) (reply RequestVoteReply) {
 	}
 
 	// update current
-	log.Printf("%d update current CurrentTerm from %d to %d for vote", rf.me, rf.status.CurrentTerm, voteArgs.Term)
-	rf.status.CurrentTerm = voteArgs.Term
+	//log.Printf("%d update current CurrentTerm from %d to %d for vote", rf.me, rf.status.CurrentTerm, voteArgs.Term)
+	//rf.status.CurrentTerm = voteArgs.Term
 
 	log.Printf("%d vote for service %d", rf.me, voteArgs.Id)
 

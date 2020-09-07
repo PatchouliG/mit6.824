@@ -11,7 +11,6 @@ type Status struct {
 	CurrentTerm Term
 	Log         []Entry
 	VoteFor     map[Term]int
-	NextIndex   Index
 }
 
 func (s *Status) getTerm(index Index) Term {
@@ -19,7 +18,7 @@ func (s *Status) getTerm(index Index) Term {
 }
 
 func NewStatus() Status {
-	res := Status{0, []Entry{}, make(map[Term]int), 1}
+	res := Status{0, []Entry{}, make(map[Term]int)}
 	res.Log = append(res.Log, newEmptyEntry(0))
 	return res
 }

@@ -73,6 +73,8 @@ const (
 	candidate = "cadidate"
 )
 
+const appendConflictDecreaseNumber = 20
+
 //
 // A Go object implementing a single Raft peer.
 //
@@ -108,6 +110,9 @@ type Raft struct {
 	committeeIndex Index
 	lastApply      Index
 	nextApplyIndex int
+
+	// only leader use
+	nextCommandIndex Index
 }
 
 func (rf *Raft) serverRoutine() {

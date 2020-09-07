@@ -16,19 +16,23 @@ func (rf *Raft) candidateRoutine() string {
 	voteSuccesfulChan := make(chan RequestVoteReply, 1000)
 	voteSuccessfulCount := 0
 	rf.sendVoteRequest(voteSuccesfulChan)
+	timer := time.NewTimer(rf.randomElectionTimeout())
 
 	for {
 		select {
 		case appendEntryArgs := <-rf.appendEntryRequest:
 			res := rf.handleAppend(&appendEntryArgs)
-			if res.Result != appendEntryStaleTerm {
-				log.Printf("candidate recive a append entry request,change to follower")
+			rf.appendEntryReply <- res
+			if appendEntryArgs.CurrentTerm > rf.status.CurrentTerm {
+				log.Printf("%d as candidate recive a append request, it's term is later, turn to follower", rf.me)
+				rf.status.CurrentTerm = appendEntryArgs.CurrentTerm
 				return follower
 			}
 		case voteArgs := <-rf.voteRequestChan:
 			voteReply := rf.handleVote(voteArgs)
 			rf.voteReplyChan <- voteReply
-			if voteReply.Result == voteReplySuccess {
+			if voteArgs.Term > rf.status.CurrentTerm {
+				rf.status.CurrentTerm = voteArgs.Term
 				return follower
 			}
 		case voteReply := <-voteSuccesfulChan:
@@ -50,10 +54,12 @@ func (rf *Raft) candidateRoutine() string {
 				return follower
 			}
 
-		case <-time.After(rf.randomElectionTimeout()):
+		case <-timer.C:
+			log.Printf("%d canditate time out ", rf.me)
 			rf.candidateHandelTimeout(voteSuccesfulChan)
 			voteSuccesfulChan = make(chan RequestVoteReply, 1000)
 			voteSuccessfulCount = 0
+			timer = time.NewTimer(rf.randomElectionTimeout())
 		}
 	}
 }
@@ -67,7 +73,6 @@ func (rf *Raft) candidateHandelTimeout(successChan chan RequestVoteReply) {
 }
 
 func (rf *Raft) sendVoteRequest(successChan chan RequestVoteReply) {
-	log.Printf("%d candidate time out, begin CurrentTerm %d election", rf.me, rf.status.CurrentTerm)
 	voteArgs := RequestVoteArgs{rf.status.CurrentTerm,
 		Index(len(rf.status.Log) - 1),
 		rf.status.Log[len(rf.status.Log)-1].Term,

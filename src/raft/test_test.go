@@ -8,7 +8,10 @@ package raft
 // test with the original before submitting.
 //
 
-import "testing"
+import (
+	"log"
+	"testing"
+)
 import "fmt"
 import "time"
 import "math/rand"
@@ -224,7 +227,7 @@ func TestFailNoAgree2B(t *testing.T) {
 		t.Fatalf("unexpected index %v", index2)
 	}
 
-	cfg.one(1000, servers, true)
+	//cfg.one(1000, servers, true)
 
 	cfg.end()
 }
@@ -605,6 +608,7 @@ func TestPersist22C(t *testing.T) {
 
 	index := 1
 	for iters := 0; iters < 5; iters++ {
+		log.Printf("iter %d", iters)
 		cfg.one(10+index, servers, true)
 		index++
 

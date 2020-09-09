@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"time"
 )
 
@@ -29,7 +30,8 @@ func test(ouput chan int) {
 }
 
 func main() {
-	fmt.Println(time.Now().Nanosecond())
-	fmt.Println(time.Now().Nanosecond())
-	fmt.Println(time.Now().Nanosecond())
+	a := []int{1, 2, 1, 2, 3, 5, 3, 4}
+
+	sort.Ints(a)
+
 }

@@ -11,16 +11,6 @@ func (s *Status) logContain(index Index, term Term) bool {
 	return len(s.Log) > int(index) && s.Log[index].Term == term
 }
 
-// not need any more, just compare current
-//// -1 less 0 equal 1 large
-//func (s *Status) lastLogTermCompare(CurrentTerm CurrentTerm) int {
-//	if len(s.Log) == 0 {
-//		return -1
-//	}
-//	entry := s.Log[len(s.Log)]
-//	return int(entry.CurrentTerm - CurrentTerm)
-//}
-
 // return true if append success
 func (rf *Raft) handleAppend(appendArg *AppendEntryArgs) AppendEntryReply {
 
@@ -34,6 +24,7 @@ func (rf *Raft) handleAppend(appendArg *AppendEntryArgs) AppendEntryReply {
 	log.Printf("%d receive append request ,update CurrentTerm from %d to %d", rf.me, rf.status.CurrentTerm,
 		appendArg.CurrentTerm)
 	rf.status.CurrentTerm = appendArg.CurrentTerm
+	rf.persist()
 
 	//update append time
 	rf.lastAppendEntryTime = time.Now()
@@ -72,7 +63,6 @@ func (rf *Raft) handleAppend(appendArg *AppendEntryArgs) AppendEntryReply {
 
 func (rf *Raft) handleVote(voteArgs RequestVoteArgs) (reply RequestVoteReply) {
 
-	log.Printf("%d receive vote", rf.me)
 	reply.CurrentTerm = rf.status.CurrentTerm
 	if voteArgs.Term <= rf.status.CurrentTerm {
 		log.Printf("%d receive vote request from an old CurrentTerm, current CurrentTerm is %d, Reply CurrentTerm is %d, refuse it",
@@ -101,10 +91,6 @@ func (rf *Raft) handleVote(voteArgs RequestVoteArgs) (reply RequestVoteReply) {
 		reply.Result = voteReplyApplyAlreadyVote
 		return
 	}
-
-	// update current
-	//log.Printf("%d update current CurrentTerm from %d to %d for vote", rf.me, rf.status.CurrentTerm, voteArgs.Term)
-	//rf.status.CurrentTerm = voteArgs.Term
 
 	log.Printf("%d vote for service %d", rf.me, voteArgs.Id)
 

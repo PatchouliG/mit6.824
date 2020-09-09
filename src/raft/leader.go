@@ -22,6 +22,9 @@ func (rf *Raft) leaderRoutine() string {
 	//init follower info
 	followerInfos := make(map[int]FollowerInfo)
 	for id := range rf.peers {
+		if id == rf.me {
+			continue
+		}
 		followerInfos[id] = FollowerInfo{Index(len(rf.status.Log) - 1), 0}
 	}
 	rf.followersInfo = followerInfos
@@ -37,16 +40,16 @@ func (rf *Raft) leaderRoutine() string {
 			break
 		}
 	}
+	timer := time.NewTimer(rf.randomElectionTimeout())
 
 	for {
-		timer := time.NewTimer(rf.randomElectionTimeout())
 		select {
 		// todo client Command
 		//case
 		case appendEntryArgs := <-rf.appendEntryRequest:
 			// todo change to follower
 			if rf.status.CurrentTerm == appendEntryArgs.CurrentTerm {
-				log.Fatalln("two lead in same CurrentTerm")
+				log.Fatalf("%d two lead  in same CurrentTerm", rf.me)
 				break
 			}
 
@@ -64,6 +67,7 @@ func (rf *Raft) leaderRoutine() string {
 				log.Printf("leader %d receive a vote from %d, turn to follower",
 					rf.me, voteArgs.Id)
 				rf.status.CurrentTerm = voteArgs.Term
+				rf.persist()
 				return follower
 			}
 
@@ -94,6 +98,7 @@ func (rf *Raft) leaderRoutine() string {
 			entry := Entry{rf.status.CurrentTerm, false, command, rf.nextCommandIndex}
 			rf.nextCommandIndex++
 			rf.status.Log = append(rf.status.Log, entry)
+			rf.persist()
 			//rf.status.lastCommitteeIndex++
 			rf.LeaderSyncLog(appendReplyChan)
 			rf.startReplyChan <- StartReply{int(entry.Index), int(rf.status.CurrentTerm)}
@@ -102,6 +107,7 @@ func (rf *Raft) leaderRoutine() string {
 			rf.LeaderAppendHeatBeat()
 			log.Printf("%d send heart beat after time interval", rf.me)
 			rf.LeaderSyncLog(appendReplyChan)
+			timer = time.NewTimer(rf.randomElectionTimeout())
 		}
 	}
 	return ""
@@ -120,7 +126,7 @@ func (rf *Raft) LeaderSyncCommittedIndex() {
 	}
 	sort.Ints(followerMatchIndexList)
 	// add 1: include self
-	committedIndex := Index(followerMatchIndexList[len(followerMatchIndexList)/2+1])
+	committedIndex := Index(followerMatchIndexList[len(followerMatchIndexList)/2])
 	if committedIndex > rf.committeeIndex {
 		log.Printf("%d update committee index from %d to %d", rf.me, rf.committeeIndex, committedIndex)
 		for _, entry := range rf.status.Log[rf.committeeIndex+1 : committedIndex+1] {

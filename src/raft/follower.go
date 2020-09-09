@@ -1,35 +1,38 @@
 package raft
 
 import (
-	"log"
 	"time"
 )
 
 func (rf *Raft) followerRoutine() string {
+	//rf.lastAppendEntryTime = time.Now()
 	for {
-		timer := time.NewTimer(timeoutCheck)
+		receiveAppend := false
+		grantingVote := false
+		timeout := rf.randomElectionTimeout()
+		timer := time.NewTimer(timeout)
 		select {
 		case appendEntryArgs := <-rf.appendEntryRequest:
+			if appendEntryArgs.CurrentTerm >= rf.status.CurrentTerm {
+				receiveAppend = true
+				//rf.lastAppendEntryTime = time.Now()
+			}
 			res := rf.handleAppend(&appendEntryArgs)
 			rf.appendEntryReply <- res
 		case voteArgs := <-rf.voteRequestChan:
 			res := rf.handleVote(voteArgs)
 			rf.voteReplyChan <- res
+
+			if voteArgs.Term > rf.status.CurrentTerm {
+				rf.status.CurrentTerm = voteArgs.Term
+				grantingVote = true
+				rf.persist()
+			}
+
 		case <-timer.C:
-			nextRole := rf.followerCheckTimeout()
-			if nextRole {
+			if !receiveAppend && !grantingVote {
 				return candidate
 			}
 		}
 	}
-}
-
-// true if change
-func (rf *Raft) followerCheckTimeout() bool {
-
-	if time.Now().Sub(rf.lastAppendEntryTime) > rf.randomElectionTimeout() {
-		log.Printf("%d timeout, begin election,current CurrentTerm is %d", rf.me, rf.status.CurrentTerm)
-		return true
-	}
-	return false
 }

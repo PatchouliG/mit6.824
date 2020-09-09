@@ -26,13 +26,16 @@ func (rf *Raft) candidateRoutine() string {
 			if appendEntryArgs.CurrentTerm > rf.status.CurrentTerm {
 				log.Printf("%d as candidate recive a append request, it's term is later, turn to follower", rf.me)
 				rf.status.CurrentTerm = appendEntryArgs.CurrentTerm
+				rf.persist()
 				return follower
 			}
 		case voteArgs := <-rf.voteRequestChan:
 			voteReply := rf.handleVote(voteArgs)
 			rf.voteReplyChan <- voteReply
 			if voteArgs.Term > rf.status.CurrentTerm {
+				log.Printf("%d vote get a later term,update from %d to %d ", rf.me, rf.status.CurrentTerm, voteArgs.Term)
 				rf.status.CurrentTerm = voteArgs.Term
+				rf.persist()
 				return follower
 			}
 		case voteReply := <-voteSuccesfulChan:
@@ -49,13 +52,13 @@ func (rf *Raft) candidateRoutine() string {
 			case voteReplyLatestLogEntryIsNotUpdateToMe:
 				continue
 			case voteReplyStaleTerm:
-				log.Printf("%d receive stale CurrentTerm when request vote, turn to follower", rf.me)
-				rf.status.CurrentTerm = voteReply.CurrentTerm
-				return follower
+				//log.Printf("%d receive stale CurrentTerm when request vote, turn to follower", rf.me)
+				//rf.status.CurrentTerm = voteReply.CurrentTerm
+				//return follower
 			}
 
 		case <-timer.C:
-			log.Printf("%d canditate time out ", rf.me)
+			log.Printf("%d canditate is time out, next turn", rf.me)
 			rf.candidateHandelTimeout(voteSuccesfulChan)
 			voteSuccesfulChan = make(chan RequestVoteReply, 1000)
 			voteSuccessfulCount = 0
@@ -83,7 +86,7 @@ func (rf *Raft) sendVoteRequest(successChan chan RequestVoteReply) {
 		}
 		go func(id int) {
 			voteReply := RequestVoteReply{}
-			log.Printf("%d send vote request from to %d", rf.me, id)
+			log.Printf("%d send vote request from to %d,term is %d", rf.me, id, rf.status.CurrentTerm)
 			rf.sendRequestVote(id, &voteArgs, &voteReply)
 			successChan <- voteReply
 		}(id)

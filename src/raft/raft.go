@@ -52,11 +52,11 @@ type ApplyMsg struct {
 var electionTimeout = time.Duration(time.Millisecond * 200)
 
 func (rf *Raft) randomElectionTimeout() time.Duration {
-	seed := int64((rf.me + 7) * 65535 * int(rf.status.CurrentTerm+17) * 255)
-	rand.Seed(seed)
+	//seed := int64((rf.me * 13) * int(rf.status.CurrentTerm*17))
+	//rand.Seed(seed)
 	//log.Printf("debug %d rand seed is %d", rf.me, seed)
 
-	res := time.Duration(int64(float64(electionTimeout) + (rand.Float64() * float64(time.Duration(time.Millisecond*300)))))
+	res := time.Duration(int64(float64(electionTimeout) + (rf.rand.Float64() * float64(time.Duration(time.Millisecond*400)))))
 	//log.Printf("debug %d timeout is %d", rf.me, res)
 	return res
 
@@ -70,10 +70,10 @@ var timeoutCheck = time.Duration(time.Millisecond * 20)
 const (
 	leader    = "leader"
 	follower  = "follower"
-	candidate = "cadidate"
+	candidate = "candidate"
 )
 
-const appendConflictDecreaseNumber = 20
+const appendConflictDecreaseNumber = 200
 
 //
 // A Go object implementing a single Raft peer.
@@ -113,6 +113,8 @@ type Raft struct {
 
 	// only leader use
 	nextCommandIndex Index
+
+	rand *rand.Rand
 }
 
 func (rf *Raft) serverRoutine() {
@@ -162,17 +164,16 @@ func (rf *Raft) readPersist(data []byte) {
 	}
 	// Your code here (2C).
 	// Example:
-	// r := bytes.NewBuffer(data)
-	// d := labgob.NewDecoder(r)
-	// var xxx
-	// var yyy
-	// if d.Decode(&xxx) != nil ||
-	//    d.Decode(&yyy) != nil {
-	//   error...
-	// } else {
-	//   rf.xxx = xxx
-	//   rf.yyy = yyy
-	// }
+	r := bytes.NewBuffer(data)
+	d := labgob.NewDecoder(r)
+	var status Status
+	if d.Decode(&status) != nil {
+		log.Fatalf("%d read persiste error ", rf.me)
+		//    d.Decode(&yyy) != nil {
+		//   error...
+	} else {
+		rf.status = status
+	}
 }
 
 //
@@ -369,6 +370,8 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.committeeIndex = 0
 	rf.lastApply = 0
 	rf.applyMsgChan = applyCh
+	seed := time.Now().UnixNano()
+	rf.rand = rand.New(rand.NewSource(seed))
 
 	// Your initialization code here (2A, 2B, 2C).
 

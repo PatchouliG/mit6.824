@@ -65,8 +65,6 @@ func (rf *Raft) randomElectionTimeout() time.Duration {
 // todo value
 var HeatBeatTimeout = time.Duration(time.Millisecond * 120)
 
-var timeoutCheck = time.Duration(time.Millisecond * 20)
-
 const (
 	leader    = "leader"
 	follower  = "follower"
@@ -221,14 +219,10 @@ const (
 type AppendEntryResult int
 
 type AppendEntryReply struct {
-	Result AppendEntryResult
-	Term   Term
-}
-
-type AppendEntryInfo struct {
-	Id    int
-	Args  AppendEntryArgs
-	Reply AppendEntryReply
+	Id        int
+	Result    AppendEntryResult
+	Term      Term
+	LastIndex Index
 }
 
 func (rf *Raft) sendAppendEntry(server int, args *AppendEntryArgs, reply *AppendEntryReply) bool {
@@ -370,6 +364,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.applyMsgChan = applyCh
 	seed := time.Now().UnixNano()
 	rf.rand = rand.New(rand.NewSource(seed))
+	rf.lastApply = 0
 
 	// Your initialization code here (2A, 2B, 2C).
 

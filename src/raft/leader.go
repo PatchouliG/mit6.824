@@ -10,7 +10,7 @@ func (rf *Raft) leaderRoutine() string {
 
 	log.Printf("%d leader,last index is %d,content is %v", rf.me, len(rf.status.Log)-1, rf.status.lastEntry())
 
-	appendReplyChan := make(chan AppendEntryInfo)
+	appendReplyChan := make(chan AppendEntryReply)
 
 	rf.LeaderAppendHeatBeat()
 
@@ -35,7 +35,7 @@ func (rf *Raft) leaderRoutine() string {
 			break
 		}
 	}
-	timer := time.NewTimer(rf.randomElectionTimeout())
+	timer := time.NewTimer(HeatBeatTimeout)
 
 	for {
 		select {
@@ -69,8 +69,8 @@ func (rf *Raft) leaderRoutine() string {
 				return follower
 			}
 
-		case appendInfo := <-appendReplyChan:
-			id, request, reply := appendInfo.Id, appendInfo.Args, appendInfo.Reply
+		case reply := <-appendReplyChan:
+			id := reply.Id
 			switch reply.Result {
 			case appendEntryStaleTerm:
 				log.Printf("%d recieve more later CurrentTerm ,change from leader to follower", rf.me)
@@ -78,7 +78,8 @@ func (rf *Raft) leaderRoutine() string {
 				return follower
 			case appendEntryAccept:
 				followerInfo := rf.followersInfo[id]
-				followerInfo.NextIndex = Index(int(request.PreviousEntryIndex) + len(request.Entries) + 1)
+				followerInfo.NextIndex = reply.LastIndex + 1
+
 				followerInfo.MatchIndex = followerInfo.NextIndex - 1
 				log.Printf("%d update %d next index to %d", rf.me, id, followerInfo.NextIndex)
 				rf.followersInfo[id] = followerInfo
@@ -106,7 +107,7 @@ func (rf *Raft) leaderRoutine() string {
 			rf.LeaderAppendHeatBeat()
 			log.Printf("%d send heart beat after time interval", rf.me)
 			rf.LeaderSyncLog(appendReplyChan)
-			timer = time.NewTimer(rf.randomElectionTimeout())
+			timer = time.NewTimer(HeatBeatTimeout)
 		}
 	}
 	return ""
@@ -144,7 +145,7 @@ func (rf *Raft) LeaderSyncCommittedIndex() {
 }
 
 // sync leader Log to all peer
-func (rf *Raft) LeaderSyncLog(appendReplyChan chan AppendEntryInfo) {
+func (rf *Raft) LeaderSyncLog(appendReplyChan chan AppendEntryReply) {
 	log.Printf("%d begin sync log", rf.me)
 	for id := range rf.peers {
 		if id == rf.me {
@@ -153,17 +154,13 @@ func (rf *Raft) LeaderSyncLog(appendReplyChan chan AppendEntryInfo) {
 		followerInfo := rf.followersInfo[id]
 		previousIndex := followerInfo.NextIndex - 1
 		log.Printf("follower %d info is %v", id, followerInfo)
-		log.Printf("debug %d send append to %d,previous index is %d", rf.me, id, previousIndex)
 		request := AppendEntryArgs{previousIndex, rf.status.getTerm(previousIndex),
 			rf.status.Log[followerInfo.NextIndex:], rf.status.CurrentTerm,
 			rf.committeeIndex}
 		go func(id int, args AppendEntryArgs) {
-			if args.PreviousEntryIndex == 0 {
-				log.Printf("error, NextIndex is %d", followerInfo.NextIndex)
-			}
 			reply := AppendEntryReply{}
 			rf.sendAppendEntry(id, &args, &reply)
-			appendReplyChan <- AppendEntryInfo{id, request, reply}
+			appendReplyChan <- reply
 		}(id, request)
 	}
 }

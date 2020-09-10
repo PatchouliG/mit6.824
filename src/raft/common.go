@@ -16,28 +16,40 @@ func (rf *Raft) handleAppend(appendArg *AppendEntryArgs) AppendEntryReply {
 	if rf.status.CurrentTerm > appendArg.CurrentTerm {
 		log.Printf("%d append entry's CurrentTerm mistach, current CurrentTerm is %d, "+
 			"CurrentTerm in requeset is %d ,reject it", rf.me, rf.status.CurrentTerm, appendArg.CurrentTerm)
-		return AppendEntryReply{appendEntryStaleTerm, rf.status.CurrentTerm}
+		return AppendEntryReply{rf.me, appendEntryStaleTerm, rf.status.CurrentTerm, -1}
 	}
 
 	log.Printf("%d receive a append,previous index is %d,term is %d, service last index is %d,last entry term is %d",
 		rf.me, appendArg.PreviousEntryIndex, appendArg.PreviousEntryTerm, len(rf.status.Log)-1, rf.status.lastEntry().Term)
 
-	//update append time
 	match := rf.status.logContain(appendArg.PreviousEntryIndex, appendArg.PreviousEntryTerm)
 
 	if !match {
 		log.Printf("append entry prev entry match fail")
-		return AppendEntryReply{appendEntryNotMatch, rf.status.CurrentTerm}
+		return AppendEntryReply{rf.me, appendEntryNotMatch, rf.status.CurrentTerm, -1}
 	}
 
 	// delete log conflict
-	if len(rf.status.Log)-1 != int(appendArg.PreviousEntryIndex) {
-		log.Printf("%d delete all Log after the match,from %d to %d",
-			rf.me, appendArg.PreviousEntryIndex+1, len(rf.status.Log)-1)
-		rf.status.Log = rf.status.Log[:appendArg.PreviousEntryIndex+1]
+	//if rf.status.Log[int(appendArg.PreviousEntryIndex)].Term != appendArg.PreviousEntryTerm {
+	//	log.Printf("%d delete all Log after the match,from %d to %d",
+	//		rf.me, appendArg.PreviousEntryIndex+1, len(rf.status.Log)-1)
+	//	rf.status.Log = rf.status.Log[:appendArg.PreviousEntryIndex+1]
+	//}
+
+	for i := 0; i < len(appendArg.Entries); i++ {
+		newEntry := appendArg.Entries[i]
+		position := int(appendArg.PreviousEntryIndex) + 1 + i
+		if position < len(rf.status.Log) {
+			entry := rf.status.Log[position]
+			if entry.Term != newEntry.Term {
+				rf.status.Log[position] = appendArg.Entries[i]
+				rf.status.Log = rf.status.Log[:position+1]
+			}
+		} else {
+			rf.status.Log = append(rf.status.Log, newEntry)
+		}
 	}
 
-	rf.status.Log = append(rf.status.Log, appendArg.Entries...)
 	if appendArg.LeaderCommittee > rf.committeeIndex {
 		//todo  apply to state machine
 		for _, entry := range rf.status.Log[rf.committeeIndex+1 : appendArg.LeaderCommittee+1] {
@@ -56,7 +68,8 @@ func (rf *Raft) handleAppend(appendArg *AppendEntryArgs) AppendEntryReply {
 	}
 	rf.persist()
 	log.Printf("append finish, log size is %d", len(rf.status.Log))
-	return AppendEntryReply{appendEntryAccept, rf.status.CurrentTerm}
+	return AppendEntryReply{rf.me, appendEntryAccept,
+		rf.status.CurrentTerm, Index(len(rf.status.Log) - 1)}
 
 }
 
@@ -74,7 +87,7 @@ func (rf *Raft) handleVote(voteArgs RequestVoteArgs) (reply RequestVoteReply) {
 	lastSlotIndex := len(rf.status.Log) - 1
 	lastSlotTerm := rf.status.Log[lastSlotIndex].Term
 
-	log.Printf("%d receive vote, service index is %d,term is %d,vote id is %d ,index is %d,term is %d",
+	log.Printf("%d receive vote, service index is %d,term is %d,vote Id is %d ,index is %d,term is %d",
 		rf.me, lastSlotIndex, lastSlotTerm, voteArgs.Id, voteArgs.LastSlotIndex, voteArgs.LastSlotTerm)
 
 	if lastSlotTerm > voteArgs.LastSlotTerm ||

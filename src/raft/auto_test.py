@@ -9,12 +9,14 @@ import sys
 import os
 
 if __name__ == '__main__':
-    import subprocess
 
-    # test_name = sys.argv[1]
-    for i in range(1, 20):
-        res = os.system("go test -run TestUnreliableChurn2C > tmp")
-        if res != 0:
-            break
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    # test_name = ["2A", "2B"]
+    test_name = ["2A"]
+    for test in test_name:
+        print("start test " + test)
+        for i in range(1, 20):
+            print(str(i) + "start")
+            res = os.system("go test -run " + test + " > tmp")
+            if res != 0:
+                print("fail int trun " + str(i))
+                break

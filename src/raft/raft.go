@@ -91,15 +91,14 @@ type Raft struct {
 	// state a Raft server must maintain.
 
 	// all data need persist
-	applyMsgChan        chan ApplyMsg
-	status              Status
-	lastAppendEntryTime time.Time
-	peerStatusMap       map[int]PeerStatus
-	appendEntryRequest  chan AppendEntryArgs
-	appendEntryReply    chan AppendEntryReply
-	voteReplyChan       chan RequestVoteReply
-	voteRequestChan     chan RequestVoteArgs
-	startRequestChan    chan Command
+	applyMsgChan       chan ApplyMsg
+	status             Status
+	peerStatusMap      map[int]PeerStatus
+	appendEntryRequest chan AppendEntryArgs
+	appendEntryReply   chan AppendEntryReply
+	voteReplyChan      chan RequestVoteReply
+	voteRequestChan    chan RequestVoteArgs
+	startRequestChan   chan Command
 	// todo
 	startReplyChan chan StartReply
 
@@ -358,7 +357,6 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.persister = persister
 	rf.me = me
 	rf.status = NewStatus()
-	rf.lastAppendEntryTime = time.Now()
 	rf.appendEntryRequest = make(chan AppendEntryArgs)
 	rf.appendEntryReply = make(chan AppendEntryReply)
 	rf.voteReplyChan = make(chan RequestVoteReply)

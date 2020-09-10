@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"log"
 	"time"
 )
 
@@ -15,8 +16,16 @@ func (rf *Raft) followerRoutine() string {
 		case appendEntryArgs := <-rf.appendEntryRequest:
 			if appendEntryArgs.CurrentTerm >= rf.status.CurrentTerm {
 				receiveAppend = true
-				//rf.lastAppendEntryTime = time.Now()
 			}
+
+			if appendEntryArgs.CurrentTerm > rf.status.CurrentTerm {
+				// update current CurrentTerm
+				log.Printf("%d receive append request ,update CurrentTerm from %d to %d", rf.me, rf.status.CurrentTerm,
+					appendEntryArgs.CurrentTerm)
+				rf.status.CurrentTerm = appendEntryArgs.CurrentTerm
+				rf.persist()
+			}
+
 			res := rf.handleAppend(&appendEntryArgs)
 			rf.appendEntryReply <- res
 		case voteArgs := <-rf.voteRequestChan:

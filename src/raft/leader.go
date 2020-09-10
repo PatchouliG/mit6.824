@@ -55,8 +55,11 @@ func (rf *Raft) leaderRoutine() string {
 
 			res := rf.handleAppend(&appendEntryArgs)
 			rf.appendEntryReply <- res
-			if res.Result != appendEntryStaleTerm {
-				log.Printf("leader %d accept a append request ,turn to follower", rf.me)
+			if appendEntryArgs.CurrentTerm > rf.status.CurrentTerm {
+				log.Printf("leader %d receive append request ,update CurrentTerm from %d to %d", rf.me, rf.status.CurrentTerm,
+					appendEntryArgs.CurrentTerm)
+				rf.status.CurrentTerm = appendEntryArgs.CurrentTerm
+				rf.persist()
 				return follower
 			}
 		case voteArgs := <-rf.voteRequestChan:
@@ -99,7 +102,6 @@ func (rf *Raft) leaderRoutine() string {
 			rf.nextCommandIndex++
 			rf.status.Log = append(rf.status.Log, entry)
 			rf.persist()
-			//rf.status.lastCommitteeIndex++
 			rf.LeaderSyncLog(appendReplyChan)
 			rf.startReplyChan <- StartReply{int(entry.Index), int(rf.status.CurrentTerm)}
 

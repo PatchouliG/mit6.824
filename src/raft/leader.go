@@ -7,13 +7,8 @@ import (
 )
 
 func (rf *Raft) leaderRoutine() string {
-	//Args := rf.getAppendArgForHeatBeat()
-	//Reply := AppendEntryReply{}
-	//for _, peer := range rf.peers {
-	// todo go on here
-	//todo handle Reply async
-	//go rf.LeaderSyncLog(peer,[]Command{newEmptyEntry()})
-	//}
+
+	log.Printf("%d leader,last index is %d,content is %v", rf.me, len(rf.status.Log)-1, rf.status.lastEntry())
 
 	appendReplyChan := make(chan AppendEntryInfo)
 
@@ -85,6 +80,7 @@ func (rf *Raft) leaderRoutine() string {
 				followerInfo := rf.followersInfo[id]
 				followerInfo.NextIndex = Index(int(request.PreviousEntryIndex) + len(request.Entries) + 1)
 				followerInfo.MatchIndex = followerInfo.NextIndex - 1
+				log.Printf("%d update %d next index to %d", rf.me, id, followerInfo.NextIndex)
 				rf.followersInfo[id] = followerInfo
 				rf.LeaderSyncCommittedIndex()
 			case appendEntryNotMatch:
@@ -93,6 +89,7 @@ func (rf *Raft) leaderRoutine() string {
 				if followerInfo.NextIndex < 1 {
 					followerInfo.NextIndex = 1
 				}
+				log.Printf("%d decrease %d log index to %d", rf.me, id, followerInfo.NextIndex)
 				rf.followersInfo[id] = followerInfo
 			}
 
@@ -155,13 +152,18 @@ func (rf *Raft) LeaderSyncLog(appendReplyChan chan AppendEntryInfo) {
 		}
 		followerInfo := rf.followersInfo[id]
 		previousIndex := followerInfo.NextIndex - 1
+		log.Printf("follower %d info is %v", id, followerInfo)
+		log.Printf("debug %d send append to %d,previous index is %d", rf.me, id, previousIndex)
 		request := AppendEntryArgs{previousIndex, rf.status.getTerm(previousIndex),
 			rf.status.Log[followerInfo.NextIndex:], rf.status.CurrentTerm,
 			rf.committeeIndex}
-		go func(id int) {
+		go func(id int, args AppendEntryArgs) {
+			if args.PreviousEntryIndex == 0 {
+				log.Printf("error, NextIndex is %d", followerInfo.NextIndex)
+			}
 			reply := AppendEntryReply{}
-			rf.sendAppendEntry(id, &request, &reply)
+			rf.sendAppendEntry(id, &args, &reply)
 			appendReplyChan <- AppendEntryInfo{id, request, reply}
-		}(id)
+		}(id, request)
 	}
 }

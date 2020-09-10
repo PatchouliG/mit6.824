@@ -17,6 +17,10 @@ func (s *Status) getTerm(index Index) Term {
 	return s.Log[index].Term
 }
 
+func (s *Status) lastEntry() Entry {
+	return s.Log[len(s.Log)-1]
+}
+
 func NewStatus() Status {
 	res := Status{0, []Entry{}, make(map[Term]int)}
 	res.Log = append(res.Log, newEmptyEntry(0))

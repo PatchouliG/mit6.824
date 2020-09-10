@@ -19,6 +19,9 @@ func (rf *Raft) handleAppend(appendArg *AppendEntryArgs) AppendEntryReply {
 		return AppendEntryReply{appendEntryStaleTerm, rf.status.CurrentTerm}
 	}
 
+	log.Printf("%d receive a append,previous index is %d,term is %d, service last index is %d,last entry term is %d",
+		rf.me, appendArg.PreviousEntryIndex, appendArg.PreviousEntryTerm, len(rf.status.Log)-1, rf.status.lastEntry().Term)
+
 	//update append time
 	match := rf.status.logContain(appendArg.PreviousEntryIndex, appendArg.PreviousEntryTerm)
 
@@ -29,7 +32,8 @@ func (rf *Raft) handleAppend(appendArg *AppendEntryArgs) AppendEntryReply {
 
 	// delete log conflict
 	if len(rf.status.Log)-1 != int(appendArg.PreviousEntryIndex) {
-		log.Printf("delete all Log after the match")
+		log.Printf("%d delete all Log after the match,from %d to %d",
+			rf.me, appendArg.PreviousEntryIndex+1, len(rf.status.Log)-1)
 		rf.status.Log = rf.status.Log[:appendArg.PreviousEntryIndex+1]
 	}
 
@@ -69,6 +73,10 @@ func (rf *Raft) handleVote(voteArgs RequestVoteArgs) (reply RequestVoteReply) {
 	// compare latest entry
 	lastSlotIndex := len(rf.status.Log) - 1
 	lastSlotTerm := rf.status.Log[lastSlotIndex].Term
+
+	log.Printf("%d receive vote, service index is %d,term is %d,vote id is %d ,index is %d,term is %d",
+		rf.me, lastSlotIndex, lastSlotTerm, voteArgs.Id, voteArgs.LastSlotIndex, voteArgs.LastSlotTerm)
+
 	if lastSlotTerm > voteArgs.LastSlotTerm ||
 		(lastSlotTerm == voteArgs.LastSlotTerm && lastSlotIndex > int(voteArgs.LastSlotIndex)) {
 		log.Printf("%d last slot CurrentTerm  is %d, last index is %d "+

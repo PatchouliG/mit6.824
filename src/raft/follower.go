@@ -7,11 +7,11 @@ import (
 
 func (rf *Raft) followerRoutine() string {
 	//rf.lastAppendEntryTime = time.Now()
+	timeout := rf.randomElectionTimeout()
+	timer := time.NewTimer(timeout)
+	receiveAppend := false
+	grantingVote := false
 	for {
-		receiveAppend := false
-		grantingVote := false
-		timeout := rf.randomElectionTimeout()
-		timer := time.NewTimer(timeout)
 		select {
 		case appendEntryArgs := <-rf.appendEntryRequest:
 			if appendEntryArgs.CurrentTerm >= rf.status.CurrentTerm {
@@ -42,6 +42,10 @@ func (rf *Raft) followerRoutine() string {
 			if !receiveAppend && !grantingVote {
 				return candidate
 			}
+			timeout = rf.randomElectionTimeout()
+			timer = time.NewTimer(timeout)
+			receiveAppend = false
+			grantingVote = false
 		}
 	}
 }

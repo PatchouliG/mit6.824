@@ -21,6 +21,7 @@ import (
 	"../labgob"
 	"../labrpc"
 	"bytes"
+	"fmt"
 	"log"
 	"math/rand"
 	"sync"
@@ -324,6 +325,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 func (rf *Raft) Kill() {
 	atomic.StoreInt32(&rf.dead, 1)
 	// Your code here, if desired.
+	fmt.Println("killed")
 }
 
 func (rf *Raft) killed() bool {

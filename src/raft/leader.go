@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"fmt"
 	"log"
 	"sort"
 	"time"
@@ -108,6 +109,11 @@ func (rf *Raft) leaderRoutine() string {
 			log.Printf("%d send heart beat after time interval", rf.me)
 			rf.LeaderSyncLog(appendReplyChan)
 			timer = time.NewTimer(HeatBeatTimeout)
+			if rf.killed() {
+				fmt.Println("killed")
+				return ""
+			}
+
 		}
 	}
 	return ""
@@ -146,7 +152,7 @@ func (rf *Raft) LeaderSyncCommittedIndex() {
 
 // sync leader Log to all peer
 func (rf *Raft) LeaderSyncLog(appendReplyChan chan AppendEntryReply) {
-	log.Printf("%d begin sync log", rf.me)
+	log.Printf("%d begin sync log,current term %d", rf.me, rf.status.CurrentTerm)
 	for id := range rf.peers {
 		if id == rf.me {
 			continue

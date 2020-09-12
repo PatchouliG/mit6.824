@@ -19,6 +19,8 @@ func (rf *Raft) callRoleRoutine(role string) {
 			rf.isLeader = true
 			role = rf.leaderRoutine()
 			rf.isLeader = false
+		default:
+			return
 		}
 	}
 }

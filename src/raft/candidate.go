@@ -23,7 +23,7 @@ func (rf *Raft) candidateRoutine() string {
 		case appendEntryArgs := <-rf.appendEntryRequest:
 			res := rf.handleAppend(&appendEntryArgs)
 			rf.appendEntryReply <- res
-			if appendEntryArgs.CurrentTerm > rf.status.CurrentTerm {
+			if appendEntryArgs.CurrentTerm >= rf.status.CurrentTerm {
 				log.Printf("%d as candidate recive a append request, it's term is later, turn to follower", rf.me)
 				rf.status.CurrentTerm = appendEntryArgs.CurrentTerm
 				rf.persist()
@@ -59,8 +59,8 @@ func (rf *Raft) candidateRoutine() string {
 
 		case <-timer.C:
 			log.Printf("%d canditate is time out, next turn", rf.me)
-			rf.candidateHandelTimeout(voteSuccesfulChan)
 			voteSuccesfulChan = make(chan RequestVoteReply, 1000)
+			rf.candidateHandelTimeout(voteSuccesfulChan)
 			voteSuccessfulCount = 0
 			timer = time.NewTimer(rf.randomElectionTimeout())
 		}
@@ -80,7 +80,7 @@ func (rf *Raft) sendVoteRequest(successChan chan RequestVoteReply) {
 		Index(len(rf.status.Log) - 1),
 		rf.status.Log[len(rf.status.Log)-1].Term,
 		rf.me}
-	for id, _ := range rf.peers {
+	for id := range rf.peers {
 		if id == rf.me {
 			continue
 		}

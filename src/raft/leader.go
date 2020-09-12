@@ -1,8 +1,8 @@
 package raft
 
 import (
-	"fmt"
 	"log"
+	"runtime"
 	"sort"
 	"time"
 )
@@ -54,7 +54,7 @@ func (rf *Raft) leaderRoutine() string {
 			if appendEntryArgs.CurrentTerm > rf.status.CurrentTerm {
 				log.Printf("leader %d receive append request ,update CurrentTerm from %d to %d", rf.me, rf.status.CurrentTerm,
 					appendEntryArgs.CurrentTerm)
-				rf.status.CurrentTerm = appendEntryArgs.CurrentTerm
+				rf.setCurrentTerm(appendEntryArgs.CurrentTerm)
 				rf.persist()
 				return follower
 			}
@@ -65,7 +65,7 @@ func (rf *Raft) leaderRoutine() string {
 			if voteArgs.Term > rf.status.CurrentTerm {
 				log.Printf("leader %d receive a vote from %d, turn to follower",
 					rf.me, voteArgs.Id)
-				rf.status.CurrentTerm = voteArgs.Term
+				rf.setCurrentTerm(voteArgs.Term)
 				rf.persist()
 				return follower
 			}
@@ -75,14 +75,14 @@ func (rf *Raft) leaderRoutine() string {
 			switch reply.Result {
 			case appendEntryStaleTerm:
 				log.Printf("%d recieve more later CurrentTerm ,change from leader to follower", rf.me)
-				rf.status.CurrentTerm = reply.Term
+				rf.setCurrentTerm(reply.Term)
 				return follower
 			case appendEntryAccept:
 				followerInfo := rf.followersInfo[id]
 				followerInfo.NextIndex = reply.LastIndex + 1
 
 				followerInfo.MatchIndex = followerInfo.NextIndex - 1
-				log.Printf("%d update %d next index to %d", rf.me, id, followerInfo.NextIndex)
+				//log.Printf("%d update %d next index to %d", rf.me, id, followerInfo.NextIndex)
 				rf.followersInfo[id] = followerInfo
 				rf.LeaderSyncCommittedIndex()
 			case appendEntryNotMatch:
@@ -91,12 +91,11 @@ func (rf *Raft) leaderRoutine() string {
 				if followerInfo.NextIndex < 1 {
 					followerInfo.NextIndex = 1
 				}
-				log.Printf("%d decrease %d log index to %d", rf.me, id, followerInfo.NextIndex)
+				//log.Printf("%d decrease %d log index to %d", rf.me, id, followerInfo.NextIndex)
 				rf.followersInfo[id] = followerInfo
 			}
 
 		case command := <-rf.startRequestChan:
-			log.Printf("debug comand log index is %d", len(rf.status.Log)-1)
 			entry := Entry{rf.status.CurrentTerm, false, command, rf.nextCommandIndex}
 			rf.nextCommandIndex++
 			rf.status.Log = append(rf.status.Log, entry)
@@ -105,18 +104,18 @@ func (rf *Raft) leaderRoutine() string {
 			rf.startReplyChan <- StartReply{int(entry.Index), int(rf.status.CurrentTerm)}
 
 		case <-timer.C:
+			if rf.killed() {
+				log.Printf("%d is killed,exit", rf.me)
+				return "exit"
+			}
+			log.Printf("routine number is %d", runtime.NumGoroutine())
 			rf.LeaderAppendHeatBeat()
 			log.Printf("%d send heart beat after time interval", rf.me)
 			rf.LeaderSyncLog(appendReplyChan)
 			timer = time.NewTimer(HeatBeatTimeout)
-			if rf.killed() {
-				fmt.Println("killed")
-				return ""
-			}
 
 		}
 	}
-	return ""
 }
 
 // append heat beat to Log
@@ -159,14 +158,17 @@ func (rf *Raft) LeaderSyncLog(appendReplyChan chan AppendEntryReply) {
 		}
 		followerInfo := rf.followersInfo[id]
 		previousIndex := followerInfo.NextIndex - 1
-		log.Printf("follower %d info is %v", id, followerInfo)
+		//log.Printf("follower %d info is %v", id, followerInfo)
 		request := AppendEntryArgs{previousIndex, rf.status.getTerm(previousIndex),
 			rf.status.Log[followerInfo.NextIndex:], rf.status.CurrentTerm,
 			rf.committeeIndex}
-		go func(id int, args AppendEntryArgs) {
+		go func(rf *Raft, id int, args AppendEntryArgs) {
 			reply := AppendEntryReply{}
 			rf.sendAppendEntry(id, &args, &reply)
+			if rf.killed() {
+				return
+			}
 			appendReplyChan <- reply
-		}(id, request)
+		}(rf, id, request)
 	}
 }

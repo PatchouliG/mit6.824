@@ -7,7 +7,7 @@ import (
 
 func (rf *Raft) candidateRoutine() string {
 
-	rf.status.CurrentTerm++
+	rf.incCurrentTerm()
 	rf.status.VoteFor[rf.status.CurrentTerm] = rf.me
 	rf.persist()
 
@@ -24,8 +24,9 @@ func (rf *Raft) candidateRoutine() string {
 			res := rf.handleAppend(&appendEntryArgs)
 			rf.appendEntryReply <- res
 			if appendEntryArgs.CurrentTerm >= rf.status.CurrentTerm {
-				log.Printf("%d as candidate recive a append request, it's term is later, turn to follower", rf.me)
-				rf.status.CurrentTerm = appendEntryArgs.CurrentTerm
+				//log.Printf("%d as candidate recive a append request, it's term is later, turn to follower", rf.me)
+				rf.setCurrentTerm(appendEntryArgs.CurrentTerm)
+
 				rf.persist()
 				return follower
 			}
@@ -33,8 +34,9 @@ func (rf *Raft) candidateRoutine() string {
 			voteReply := rf.handleVote(voteArgs)
 			rf.voteReplyChan <- voteReply
 			if voteArgs.Term > rf.status.CurrentTerm {
-				log.Printf("%d vote get a later term,update from %d to %d ", rf.me, rf.status.CurrentTerm, voteArgs.Term)
-				rf.status.CurrentTerm = voteArgs.Term
+				//log.Printf("%d vote get a later term,update from %d to %d ", rf.me, rf.status.CurrentTerm, voteArgs.Term)
+				rf.setCurrentTerm(voteArgs.Term)
+
 				rf.persist()
 				return follower
 			}
@@ -58,6 +60,10 @@ func (rf *Raft) candidateRoutine() string {
 			}
 
 		case <-timer.C:
+			if rf.killed() {
+				log.Printf("%d is killed,exit", rf.me)
+				return "exit"
+			}
 			log.Printf("%d canditate is time out, next turn", rf.me)
 			voteSuccesfulChan = make(chan RequestVoteReply, 1000)
 			rf.candidateHandelTimeout(voteSuccesfulChan)
@@ -68,7 +74,8 @@ func (rf *Raft) candidateRoutine() string {
 }
 
 func (rf *Raft) candidateHandelTimeout(successChan chan RequestVoteReply) {
-	rf.status.CurrentTerm++
+	rf.incCurrentTerm()
+
 	rf.status.VoteFor[rf.status.CurrentTerm] = rf.me
 	rf.persist()
 	rf.sendVoteRequest(successChan)
@@ -84,12 +91,15 @@ func (rf *Raft) sendVoteRequest(successChan chan RequestVoteReply) {
 		if id == rf.me {
 			continue
 		}
-		go func(id int) {
+		go func(rf *Raft, id int) {
 			voteReply := RequestVoteReply{}
 			log.Printf("%d send vote request from to %d,term is %d", rf.me, id, rf.status.CurrentTerm)
 			rf.sendRequestVote(id, &voteArgs, &voteReply)
+			if rf.killed() {
+				return
+			}
 			successChan <- voteReply
-		}(id)
+		}(rf, id)
 	}
 	//log.Printf("debug %d send vote end,current term is %d", rf.me, rf.status.CurrentTerm)
 }

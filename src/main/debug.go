@@ -1,10 +1,6 @@
 package main
 
-import (
-	"fmt"
-	"sort"
-	"time"
-)
+import "fmt"
 
 type P struct {
 	X, Y, Z int
@@ -21,17 +17,22 @@ type A interface {
 
 type Test struct {
 	i int
+	m int
 }
 
-func test(ouput chan int) {
-	time.Sleep(time.Second * 5)
-	ouput <- 1
-	fmt.Printf("ok")
+func (t *Test) test() {
+	t.m += 3
+}
+func (t *Test) test1() int {
+	return t.i
 }
 
 func main() {
-	a := []int{1, 2, 1, 2, 3, 5, 3, 4}
-
-	sort.Ints(a)
+	t := Test{1, 2}
+	for i := 1; i < 1000; i++ {
+		go t.test()
+		x := t.test1()
+		fmt.Println(x)
+	}
 
 }

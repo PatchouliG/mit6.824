@@ -6,7 +6,6 @@ import (
 )
 
 func (rf *Raft) followerRoutine() string {
-	//rf.lastAppendEntryTime = time.Now()
 	timeout := rf.randomElectionTimeout()
 	timer := time.NewTimer(timeout)
 	receiveAppend := false
@@ -16,13 +15,14 @@ func (rf *Raft) followerRoutine() string {
 		case appendEntryArgs := <-rf.appendEntryRequest:
 			if appendEntryArgs.CurrentTerm >= rf.status.CurrentTerm {
 				receiveAppend = true
+				log.Printf("%d recevie append,accept it", rf.me)
 			}
 
 			if appendEntryArgs.CurrentTerm > rf.status.CurrentTerm {
 				// update current CurrentTerm
-				log.Printf("%d receive append request ,update CurrentTerm from %d to %d", rf.me, rf.status.CurrentTerm,
-					appendEntryArgs.CurrentTerm)
-				rf.status.CurrentTerm = appendEntryArgs.CurrentTerm
+				//log.Printf("%d receive append request ,update CurrentTerm from %d to %d", rf.me, rf.status.CurrentTerm,
+				//	appendEntryArgs.CurrentTerm)
+				rf.setCurrentTerm(appendEntryArgs.CurrentTerm)
 				rf.persist()
 			}
 
@@ -33,12 +33,19 @@ func (rf *Raft) followerRoutine() string {
 			rf.voteReplyChan <- res
 
 			if voteArgs.Term > rf.status.CurrentTerm {
-				rf.status.CurrentTerm = voteArgs.Term
+				rf.setCurrentTerm(voteArgs.Term)
+				rf.persist()
+			}
+			if res.Result == voteReplySuccess {
 				grantingVote = true
 				rf.persist()
 			}
 
 		case <-timer.C:
+			if rf.killed() {
+				log.Printf("%d is killed,exit", rf.me)
+				return "exit"
+			}
 			if !receiveAppend && !grantingVote {
 				return candidate
 			}

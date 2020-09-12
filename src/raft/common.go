@@ -112,3 +112,33 @@ func (rf *Raft) handleVote(voteArgs RequestVoteArgs) (reply RequestVoteReply) {
 	reply.Result = voteReplySuccess
 	return
 }
+
+func (rf *Raft) isLeader() bool {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	return rf.leaderStatus
+
+}
+
+func (rf *Raft) changeLeader(leaderStatus bool) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	rf.leaderStatus = leaderStatus
+}
+
+func (rf *Raft) getCurrentTerm() Term {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	return rf.status.CurrentTerm
+}
+
+func (rf *Raft) incCurrentTerm() {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	rf.status.CurrentTerm++
+}
+func (rf *Raft) setCurrentTerm(term Term) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	rf.status.CurrentTerm = term
+}

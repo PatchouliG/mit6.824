@@ -18,7 +18,7 @@ if __name__ == '__main__':
     test_name = ["2C"]
     for test in all_test:
         print("start test " + test)
-        times = 7
+        times = 4
         for i in range(0, times):
             print(str(i) + "start")
             res = os.system("go test -run " + test + " > test_output")

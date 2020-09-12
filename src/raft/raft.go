@@ -9,7 +9,7 @@ package raft
 //   create a new Raft server.
 // rf.Start(Command interface{}) (index, CurrentTerm, isleader)
 //   start agreement on a new Log entry
-// rf.GetState() (CurrentTerm, isLeader)
+// rf.GetState() (CurrentTerm, leaderStatus)
 //   ask a Raft for its current CurrentTerm, and whether it thinks it is leader
 // ApplyMsg
 //   each time a new entry is committed to the Log, each Raft peer
@@ -21,7 +21,6 @@ import (
 	"../labgob"
 	"../labrpc"
 	"bytes"
-	"fmt"
 	"log"
 	"math/rand"
 	"sync"
@@ -104,7 +103,7 @@ type Raft struct {
 	followersInfo map[int]FollowerInfo
 
 	// just for lab test
-	isLeader       bool
+	leaderStatus   bool
 	committeeIndex Index
 	lastApply      Index
 	nextApplyIndex int
@@ -126,8 +125,8 @@ func (rf *Raft) GetState() (int, bool) {
 	var term int
 	var isleader bool
 	// Your code here (2A).
-	term = int(rf.status.CurrentTerm)
-	isleader = rf.isLeader
+	term = int(rf.getCurrentTerm())
+	isleader = rf.isLeader()
 
 	return term, isleader
 }
@@ -298,7 +297,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	term := -1
 	isLeader := true
 
-	if !rf.isLeader {
+	if !rf.isLeader() {
 		isLeader = false
 		return index, term, isLeader
 	}
@@ -325,7 +324,6 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 func (rf *Raft) Kill() {
 	atomic.StoreInt32(&rf.dead, 1)
 	// Your code here, if desired.
-	fmt.Println("killed")
 }
 
 func (rf *Raft) killed() bool {
@@ -360,12 +358,12 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.peerStatusMap = make(map[int]PeerStatus)
 	rf.startRequestChan = make(chan Command)
 	rf.startReplyChan = make(chan StartReply)
-	rf.isLeader = false
+	rf.leaderStatus = false
 	rf.committeeIndex = 0
 	rf.lastApply = 0
 	rf.applyMsgChan = applyCh
 	seed := time.Now().UnixNano()
-	rf.rand = rand.New(rand.NewSource(seed))
+	rf.rand = rand.New(rand.NewSource(seed + int64(13*rf.me)))
 	rf.lastApply = 0
 
 	// Your initialization code here (2A, 2B, 2C).

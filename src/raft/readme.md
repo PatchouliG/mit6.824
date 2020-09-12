@@ -32,20 +32,10 @@ go test -run 2A # run test 2A
 
 Implement the leader and follower code to append new log entries, so that the go test -run 2B tests pass.
 
+## lab 2c 
+pass
+
 
 ### todo
-在vote和append request的回复中,增加current term，当leader和candidate发现自己的term落后，直接变成follower(done)
+go race 有数据竞争，但是应该没问题
 
-增加选举限制 （done）
-
-committee 机制
-leader 的committee
-follow的committee
-
-
-对start 的支持
-
-
-
-### todo 
-检查所有的timer机制

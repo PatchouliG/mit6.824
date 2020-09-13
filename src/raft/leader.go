@@ -140,7 +140,7 @@ func (rf *Raft) LeaderSyncCommittedIndex() {
 			}
 			applyMsg := ApplyMsg{true, entry.Command.Content, int(entry.Index)}
 			log.Printf("%d leader apply msg %v", rf.me, applyMsg)
-			rf.applyMsgChan <- applyMsg
+			rf.ApplyMsgUnblockChan <- applyMsg
 			rf.nextApplyIndex++
 		}
 		rf.committeeIndex = Index(committedIndex)
@@ -165,10 +165,15 @@ func (rf *Raft) LeaderSyncLog(appendReplyChan chan AppendEntryReply) {
 		go func(rf *Raft, id int, args AppendEntryArgs) {
 			reply := AppendEntryReply{}
 			rf.sendAppendEntry(id, &args, &reply)
-			if rf.killed() {
-				return
+			timer := time.NewTimer(time.Second)
+			for {
+				select {
+				case appendReplyChan <- reply:
+					return
+				case <-timer.C:
+					return
+				}
 			}
-			appendReplyChan <- reply
 		}(rf, id, request)
 	}
 }

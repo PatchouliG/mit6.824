@@ -3,6 +3,7 @@ package raft
 import (
 	"log"
 	"math"
+	"time"
 )
 
 //return Log index  if match
@@ -58,7 +59,7 @@ func (rf *Raft) handleAppend(appendArg *AppendEntryArgs) AppendEntryReply {
 			}
 			applyMsg := ApplyMsg{true, entry.Command.Content,
 				int(entry.Index)}
-			rf.applyMsgChan <- applyMsg
+			rf.ApplyMsgUnblockChan <- applyMsg
 		}
 
 		min := Index(math.Min(float64(appendArg.LeaderCommittee), float64(len(rf.status.Log)-1)))
@@ -111,6 +112,21 @@ func (rf *Raft) handleVote(voteArgs RequestVoteArgs) (reply RequestVoteReply) {
 	rf.persist()
 	reply.Result = voteReplySuccess
 	return
+}
+
+func (rf *Raft) applyMsgRoutine() {
+	for {
+		timer := time.NewTimer(time.Second * 5)
+		select {
+		case applyMsg := <-rf.ApplyMsgUnblockChan:
+			rf.applyMsgChan <- applyMsg
+		case <-timer.C:
+			timer = time.NewTimer(time.Second * 5)
+			if rf.killed() {
+				return
+			}
+		}
+	}
 }
 
 func (rf *Raft) isLeader() bool {

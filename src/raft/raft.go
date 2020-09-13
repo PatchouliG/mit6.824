@@ -89,14 +89,15 @@ type Raft struct {
 	// state a Raft server must maintain.
 
 	// all data need persist
-	applyMsgChan       chan ApplyMsg
-	status             Status
-	peerStatusMap      map[int]PeerStatus
-	appendEntryRequest chan AppendEntryArgs
-	appendEntryReply   chan AppendEntryReply
-	voteReplyChan      chan RequestVoteReply
-	voteRequestChan    chan RequestVoteArgs
-	startRequestChan   chan Command
+	applyMsgChan        chan ApplyMsg
+	ApplyMsgUnblockChan chan ApplyMsg
+	status              Status
+	peerStatusMap       map[int]PeerStatus
+	appendEntryRequest  chan AppendEntryArgs
+	appendEntryReply    chan AppendEntryReply
+	voteReplyChan       chan RequestVoteReply
+	voteRequestChan     chan RequestVoteArgs
+	startRequestChan    chan Command
 	// todo
 	startReplyChan chan StartReply
 
@@ -362,6 +363,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.committeeIndex = 0
 	rf.lastApply = 0
 	rf.applyMsgChan = applyCh
+	rf.ApplyMsgUnblockChan = make(chan ApplyMsg, 1000)
 	seed := time.Now().UnixNano()
 	rf.rand = rand.New(rand.NewSource(seed + int64(13*rf.me)))
 	rf.lastApply = 0
@@ -371,6 +373,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 
+	go rf.applyMsgRoutine()
 	go rf.mainRoutine()
 
 	return rf

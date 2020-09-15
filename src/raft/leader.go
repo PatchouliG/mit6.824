@@ -2,14 +2,13 @@ package raft
 
 import (
 	"log"
-	"runtime"
 	"sort"
 	"time"
 )
 
 func (rf *Raft) leaderRoutine() string {
 
-	log.Printf("%d leader,last index is %d,content is %v", rf.me, len(rf.status.Log)-1, rf.status.lastEntry())
+	//log.Printf("%d leader,last index is %d,content is %v", rf.me, len(rf.status.Log)-1, rf.status.lastEntry())
 
 	appendReplyChan := make(chan AppendEntryReply)
 
@@ -45,15 +44,15 @@ func (rf *Raft) leaderRoutine() string {
 		case appendEntryArgs := <-rf.appendEntryRequest:
 			// todo change to follower
 			if rf.status.CurrentTerm == appendEntryArgs.CurrentTerm {
-				log.Fatalf("%d two lead  in same CurrentTerm", rf.me)
+				log.Fatalf("%d two lead in same CurrentTerm", rf.me)
 				break
 			}
 
 			res := rf.handleAppend(&appendEntryArgs)
 			rf.appendEntryReply <- res
 			if appendEntryArgs.CurrentTerm > rf.status.CurrentTerm {
-				log.Printf("leader %d receive append request ,update CurrentTerm from %d to %d", rf.me, rf.status.CurrentTerm,
-					appendEntryArgs.CurrentTerm)
+				//log.Printf("leader %d receive append request ,update CurrentTerm from %d to %d", rf.me, rf.status.CurrentTerm,
+				//	appendEntryArgs.CurrentTerm)
 				rf.setCurrentTerm(appendEntryArgs.CurrentTerm)
 				rf.persist()
 				return follower
@@ -63,8 +62,8 @@ func (rf *Raft) leaderRoutine() string {
 			rf.voteReplyChan <- voteReply
 
 			if voteArgs.Term > rf.status.CurrentTerm {
-				log.Printf("leader %d receive a vote from %d, turn to follower",
-					rf.me, voteArgs.Id)
+				//log.Printf("leader %d receive a vote from %d, turn to follower",
+				//	rf.me, voteArgs.Id)
 				rf.setCurrentTerm(voteArgs.Term)
 				rf.persist()
 				return follower
@@ -74,7 +73,7 @@ func (rf *Raft) leaderRoutine() string {
 			id := reply.Id
 			switch reply.Result {
 			case appendEntryStaleTerm:
-				log.Printf("%d recieve more later CurrentTerm ,change from leader to follower", rf.me)
+				//log.Printf("%d recieve more later CurrentTerm ,change from leader to follower", rf.me)
 				rf.setCurrentTerm(reply.Term)
 				return follower
 			case appendEntryAccept:
@@ -108,9 +107,9 @@ func (rf *Raft) leaderRoutine() string {
 				log.Printf("%d is killed,exit", rf.me)
 				return "exit"
 			}
-			log.Printf("routine number is %d", runtime.NumGoroutine())
+			//log.Printf("routine number is %d", runtime.NumGoroutine())
 			rf.LeaderAppendHeatBeat()
-			log.Printf("%d send heart beat after time interval", rf.me)
+			//log.Printf("%d send heart beat after time interval", rf.me)
 			rf.LeaderSyncLog(appendReplyChan)
 			timer = time.NewTimer(HeatBeatTimeout)
 
@@ -133,13 +132,13 @@ func (rf *Raft) LeaderSyncCommittedIndex() {
 	// add 1: include self
 	committedIndex := Index(followerMatchIndexList[len(followerMatchIndexList)/2])
 	if committedIndex > rf.committeeIndex {
-		log.Printf("%d update committee index from %d to %d", rf.me, rf.committeeIndex, committedIndex)
+		//log.Printf("%d update committee index from %d to %d", rf.me, rf.committeeIndex, committedIndex)
 		for _, entry := range rf.status.Log[rf.committeeIndex+1 : committedIndex+1] {
 			if entry.IsHeatBeat {
 				continue
 			}
 			applyMsg := ApplyMsg{true, entry.Command.Content, int(entry.Index)}
-			log.Printf("%d leader apply msg %v", rf.me, applyMsg)
+			//log.Printf("%d leader apply msg %v", rf.me, applyMsg)
 			rf.ApplyMsgUnblockChan <- applyMsg
 			rf.nextApplyIndex++
 		}
@@ -151,7 +150,7 @@ func (rf *Raft) LeaderSyncCommittedIndex() {
 
 // sync leader Log to all peer
 func (rf *Raft) LeaderSyncLog(appendReplyChan chan AppendEntryReply) {
-	log.Printf("%d begin sync log,current term %d", rf.me, rf.status.CurrentTerm)
+	//log.Printf("%d begin sync log,current term %d", rf.me, rf.status.CurrentTerm)
 	for id := range rf.peers {
 		if id == rf.me {
 			continue

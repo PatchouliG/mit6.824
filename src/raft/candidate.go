@@ -46,7 +46,7 @@ func (rf *Raft) candidateRoutine() string {
 				voteSuccessfulCount++
 				// +1:plus self
 				if voteSuccessfulCount+1 == len(rf.peers)/2+1 {
-					log.Printf("%d get vote number %d,change to leader", rf.me, voteSuccessfulCount)
+					//log.Printf("%d get vote number %d,change to leader", rf.me, voteSuccessfulCount)
 					return leader
 				}
 			case voteReplyApplyAlreadyVote:
@@ -64,7 +64,7 @@ func (rf *Raft) candidateRoutine() string {
 				log.Printf("%d is killed,exit", rf.me)
 				return "exit"
 			}
-			log.Printf("%d canditate is time out, next turn", rf.me)
+			//log.Printf("%d canditate is time out, next turn", rf.me)
 			voteSuccesfulChan = make(chan RequestVoteReply, 1000)
 			rf.candidateHandelTimeout(voteSuccesfulChan)
 			voteSuccessfulCount = 0
@@ -93,7 +93,7 @@ func (rf *Raft) sendVoteRequest(successChan chan RequestVoteReply) {
 		}
 		go func(rf *Raft, id int) {
 			voteReply := RequestVoteReply{}
-			log.Printf("%d send vote request from to %d,term is %d", rf.me, id, rf.status.CurrentTerm)
+			//log.Printf("%d send vote request from to %d,term is %d", rf.me, id, rf.status.CurrentTerm)
 			rf.sendRequestVote(id, &voteArgs, &voteReply)
 			if rf.killed() {
 				return

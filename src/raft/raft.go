@@ -274,7 +274,7 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 //
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
-	log.Printf("%d receive vote request from %d", rf.me, args.Id)
+	//log.Printf("%d receive vote request from %d", rf.me, args.Id)
 	rf.voteRequestChan <- *args
 	*reply = <-rf.voteReplyChan
 }
@@ -306,7 +306,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	// Your code here (2B).
 	rf.startRequestChan <- Command{command}
 	reply := <-rf.startReplyChan
-	log.Printf("%d receive start command, return term %d ,index %d", rf.me, reply.Term, reply.Index)
+	//log.Printf("%d receive start command, return term %d ,index %d", rf.me, reply.Term, reply.Index)
 
 	return reply.Index, reply.Term, isLeader
 }

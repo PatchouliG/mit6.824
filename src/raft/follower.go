@@ -15,7 +15,7 @@ func (rf *Raft) followerRoutine() string {
 		case appendEntryArgs := <-rf.appendEntryRequest:
 			if appendEntryArgs.CurrentTerm >= rf.status.CurrentTerm {
 				receiveAppend = true
-				log.Printf("%d recevie append,accept it", rf.me)
+				//log.Printf("%d recevie append,accept it", rf.me)
 			}
 
 			if appendEntryArgs.CurrentTerm > rf.status.CurrentTerm {

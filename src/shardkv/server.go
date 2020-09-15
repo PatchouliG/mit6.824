@@ -16,7 +16,7 @@ type ShardKV struct {
 	mu           sync.Mutex
 	me           int
 	rf           *raft.Raft
-	applyCh      chan raft.pplyMsg
+	applyCh      chan raft.ApplyMsg
 	make_end     func(string) *labrpc.ClientEnd
 	gid          int
 	masters      []*labrpc.ClientEnd

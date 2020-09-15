@@ -6,7 +6,18 @@ const (
 	ErrWrongLeader = "ErrWrongLeader"
 )
 
+const (
+	OpPut    = "Put"
+	OpGet    = "Get"
+	OpAppend = "Append"
+)
+
 type Err string
+
+type OpId struct {
+	ClientId int32
+	Id       int
+}
 
 // Put or Append
 type PutAppendArgs struct {
@@ -16,6 +27,7 @@ type PutAppendArgs struct {
 	// You'll have to add definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
+	OpId OpId
 }
 
 type PutAppendReply struct {
@@ -23,7 +35,8 @@ type PutAppendReply struct {
 }
 
 type GetArgs struct {
-	Key string
+	OpId OpId
+	Key  string
 	// You'll have to add definitions here.
 }
 

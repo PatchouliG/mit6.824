@@ -1,6 +1,8 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type P struct {
 	X, Y, Z int
@@ -20,6 +22,17 @@ type Test struct {
 	m int
 }
 
+func testtest(a interface{}) {
+	s, ok := a.(Q)
+	if ok {
+		fmt.Println(s.Name)
+	}
+	m, ok := a.(Test)
+	if ok {
+		fmt.Println(m.i)
+	}
+}
+
 func (t *Test) test() {
 	t.m += 3
 }
@@ -28,11 +41,17 @@ func (t *Test) test1() int {
 }
 
 func main() {
-	t := Test{1, 2}
-	for i := 1; i < 1000; i++ {
-		go t.test()
-		x := t.test1()
-		fmt.Println(x)
+	a := 2
+	for {
+		switch a {
+		case 1:
+			fmt.Print(1)
+			return
+		case 2:
+		case 3:
+			fmt.Print(3)
+			return
+		}
+		fmt.Println(2)
 	}
-
 }

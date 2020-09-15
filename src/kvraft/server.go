@@ -7,6 +7,7 @@ import (
 	"log"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 const Debug = 0
@@ -22,7 +23,14 @@ type Op struct {
 	// Your definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
+
+	Key    string
+	Value  string
+	OpId   OpId
+	OpType string
 }
+
+const commandTimeout = time.Duration(time.Second)
 
 type KVServer struct {
 	mu      sync.Mutex
@@ -34,15 +42,70 @@ type KVServer struct {
 	maxraftstate int // snapshot if log grows this big
 
 	// Your definitions here.
+
+	kvs KvStore
+	// OpId->value
+	replyNotify   map[OpId]chan KvStoreGetResult
+	replyNotifyMu sync.Mutex
 }
 
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	// Your code here.
+	c := kv.registerResultNotify(args.OpId)
+	defer kv.unRegisterResultNotify(args.OpId)
+
+	_, _, isLeader := kv.rf.Start(Op{args.Key, "", args.OpId, "Get"})
+	if !isLeader {
+		reply.Err = ErrWrongLeader
+		return
+	}
+	timer := time.NewTimer(commandTimeout)
+	select {
+	case result := <-c:
+		value, ok := result.value, result.exits
+		if !ok {
+			reply.Err = ErrNoKey
+		} else {
+			reply.Err = OK
+			reply.Value = value
+		}
+	case <-timer.C:
+		reply.Err = ErrWrongLeader
+	}
 }
 
 func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	// Your code here.
+	c := kv.registerResultNotify(args.OpId)
+	defer kv.unRegisterResultNotify(args.OpId)
+
+	_, _, isLeader := kv.rf.Start(Op{args.Key, args.Value, args.OpId, args.Op})
+	if !isLeader {
+		reply.Err = ErrWrongLeader
+		return
+	}
+	timer := time.NewTimer(commandTimeout)
+	select {
+	case result := <-c:
+		_, ok := result.value, result.exits
+		if !ok {
+			reply.Err = ErrNoKey
+		} else {
+			reply.Err = OK
+		}
+	case <-timer.C:
+		reply.Err = ErrWrongLeader
+	}
 }
+
+//func (kv *KVServer) registerResp(ClientId int, opId int) chan struct{} {
+//	c := make(chan struct{})
+//	kv.replyDone[strconv.Itoa(ClientId)+":"+strconv.Itoa(opId)] = c
+//	return c
+//}
+//func (kv *KVServer) unRegisterResp(ClientId int, opId int) {
+//	kv.replyDone[strconv.Itoa(ClientId)+":"+strconv.Itoa(opId)] = nil
+//}
 
 //
 // the tester calls Kill() when a KVServer instance won't
@@ -63,6 +126,63 @@ func (kv *KVServer) Kill() {
 func (kv *KVServer) killed() bool {
 	z := atomic.LoadInt32(&kv.dead)
 	return z == 1
+}
+
+func (kv *KVServer) notifyResult(opId OpId, result KvStoreGetResult) {
+	kv.replyNotifyMu.Lock()
+	defer kv.replyNotifyMu.Unlock()
+	if replyChan, ok := kv.replyNotify[opId]; ok {
+		replyChan <- result
+	}
+}
+func (kv *KVServer) registerResultNotify(opId OpId) chan KvStoreGetResult {
+	res := make(chan KvStoreGetResult, 2)
+	kv.replyNotifyMu.Lock()
+	defer kv.replyNotifyMu.Unlock()
+	kv.replyNotify[opId] = res
+	return res
+}
+func (kv *KVServer) unRegisterResultNotify(opId OpId) {
+	kv.replyNotifyMu.Lock()
+	defer kv.replyNotifyMu.Unlock()
+	delete(kv.replyNotify, opId)
+}
+
+func (kv *KVServer) applyResultRoutine() {
+	for {
+		timer := time.NewTimer(time.Second)
+		select {
+		case applyMsg := <-kv.applyCh:
+			op := applyMsg.Command.(Op)
+			kv.replyNotifyMu.Lock()
+			notifyChan, ok := kv.replyNotify[op.OpId]
+			kv.replyNotifyMu.Unlock()
+			switch op.OpType {
+			case OpGet:
+				res := kv.kvs.Get(op.Key)
+
+				if ok {
+					notifyChan <- res
+				}
+			case OpPut:
+				kv.kvs.Put(op.OpId, op.Key, op.Value)
+				if ok {
+					notifyChan <- KvStoreGetResult{"", true}
+				}
+			case OpAppend:
+				kv.kvs.append(op.OpId, op.Key, op.Value)
+				if ok {
+					notifyChan <- KvStoreGetResult{"", true}
+				}
+			}
+		case <-timer.C:
+			timer = time.NewTimer(time.Second)
+			if kv.killed() {
+				return
+			}
+		}
+
+	}
 }
 
 //
@@ -87,13 +207,18 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv := new(KVServer)
 	kv.me = me
 	kv.maxraftstate = maxraftstate
+	kv.replyNotify = make(map[OpId]chan KvStoreGetResult)
 
 	// You may need initialization code here.
 
 	kv.applyCh = make(chan raft.ApplyMsg)
 	kv.rf = raft.Make(servers, me, persister, kv.applyCh)
+	//kv.replyDone = make(map[string]chan struct{})
+	kv.kvs = newKVStore()
+	go kv.applyResultRoutine()
 
 	// You may need initialization code here.
+	//go kv.dispatchResult()
 
 	return kv
 }

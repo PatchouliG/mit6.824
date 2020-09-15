@@ -10,15 +10,11 @@ import os
 
 if __name__ == '__main__':
 
-    # test_name = ["2A", "2B","",]
-    # test_name = ["2A", "2B"]
     all_test = ["2A", "2B", "2C"]
-    # test_name = ["TestUnreliableAgree2C"]
-    # test_name = ["TestFigure8Unreliable2C"]
-    test_name = ["2C"]
-    for test in all_test:
+    test_name = ["3A"]
+    for test in test_name:
         print("start test " + test)
-        times = 10
+        times = 1
         for i in range(0, times):
             print(str(i) + "start")
             res = os.system("go test -run " + test + " > test_output")

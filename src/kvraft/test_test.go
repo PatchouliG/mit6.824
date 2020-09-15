@@ -1,6 +1,8 @@
 package kvraft
 
-import "../porcupine"
+import (
+	"../porcupine"
+)
 import "../models"
 import "testing"
 import "strconv"

@@ -5,13 +5,10 @@ import (
 	"time"
 )
 
-//return Log index  if match
-func (s *Status) logContain(index Index, term Term) bool {
-	return len(s.Log) > int(index) && s.Log[index].Term == term
-}
-
 // return true if append success
 func (rf *Raft) handleAppend(appendArg *AppendEntryArgs) AppendEntryReply {
+
+	defer rf.persist()
 
 	if rf.status.CurrentTerm > appendArg.CurrentTerm {
 		//log.Printf("%d append entry's CurrentTerm mistach, current CurrentTerm is %d, "+
@@ -19,7 +16,7 @@ func (rf *Raft) handleAppend(appendArg *AppendEntryArgs) AppendEntryReply {
 		return AppendEntryReply{rf.me, appendEntryStaleTerm, rf.status.CurrentTerm, -1}
 	}
 
-	//log.Printf("%d receive a append,previous index is %d,term is %d, service last index is %d,last entry term is %d",
+	//log.Printf("%d receive a append,previous Index is %d,term is %d, service last Index is %d,last entry term is %d",
 	//	rf.me, appendArg.PreviousEntryIndex, appendArg.PreviousEntryTerm, len(rf.status.Log)-1, rf.status.lastEntry().Term)
 
 	match := rf.status.logContain(appendArg.PreviousEntryIndex, appendArg.PreviousEntryTerm)
@@ -29,46 +26,44 @@ func (rf *Raft) handleAppend(appendArg *AppendEntryArgs) AppendEntryReply {
 		return AppendEntryReply{rf.me, appendEntryNotMatch, rf.status.CurrentTerm, -1}
 	}
 
-	// delete log conflict
-	//if rf.status.Log[int(appendArg.PreviousEntryIndex)].Term != appendArg.PreviousEntryTerm {
-	//	log.Printf("%d delete all Log after the match,from %d to %d",
-	//		rf.me, appendArg.PreviousEntryIndex+1, len(rf.status.Log)-1)
-	//	rf.status.Log = rf.status.Log[:appendArg.PreviousEntryIndex+1]
-	//}
-
-	for i := 0; i < len(appendArg.Entries); i++ {
-		newEntry := appendArg.Entries[i]
-		position := int(appendArg.PreviousEntryIndex) + 1 + i
-		if position < len(rf.status.Log) {
-			entry := rf.status.Log[position]
+	for i, newEntry := range appendArg.Entries {
+		if entry, position, ok := rf.status.getEntry(newEntry.Index); ok {
 			if entry.Term != newEntry.Term {
-				rf.status.Log[position] = appendArg.Entries[i]
-				rf.status.Log = rf.status.Log[:position+1]
+				rf.status.deleteAfter(position)
+				rf.status.append(appendArg.Entries[i:])
 			}
 		} else {
-			rf.status.Log = append(rf.status.Log, newEntry)
+			rf.status.append(appendArg.Entries[i:])
+			break
+			//rf.status.Log = append(rf.status.Log, newEntry)
 		}
 	}
 
 	if appendArg.LeaderCommittee > rf.committeeIndex {
-		for _, entry := range rf.status.Log[rf.committeeIndex+1 : appendArg.LeaderCommittee+1] {
+		for i := rf.committeeIndex + 1; i <= appendArg.LeaderCommittee; i++ {
+			//for _, entry := range rf.status.Log[rf.committeeIndex+1 : appendArg.LeaderCommittee+1] {
+			entry, _, ok := rf.status.getEntry(Index(i))
+
+			if !ok {
+				break
+			}
+
 			if entry.IsHeatBeat {
 				continue
 			}
-			applyMsg := ApplyMsg{true, entry.Command.Content,
-				int(entry.Index)}
+			applyMsg := ApplyMsg{true, entry.Command.Operation,
+				entry.Command.Index}
 			rf.ApplyMsgUnblockChan <- applyMsg
 		}
 
-		min := Index(math.Min(float64(appendArg.LeaderCommittee), float64(len(rf.status.Log)-1)))
-		//log.Printf("%d update committee index from %d to %d", rf.me, rf.committeeIndex, min)
+		min := Index(math.Min(float64(appendArg.LeaderCommittee), float64(rf.status.lastIndex())))
+		//log.Printf("%d update committee Index from %d to %d", rf.me, rf.committeeIndex, min)
 		rf.committeeIndex = min
 		rf.lastApply = min
 	}
-	rf.persist()
 	//log.Printf("append finish, log size is %d", len(rf.status.Log))
 	return AppendEntryReply{rf.me, appendEntryAccept,
-		rf.status.CurrentTerm, Index(len(rf.status.Log) - 1)}
+		rf.status.CurrentTerm, rf.status.lastIndex()}
 
 }
 
@@ -83,16 +78,16 @@ func (rf *Raft) handleVote(voteArgs RequestVoteArgs) (reply RequestVoteReply) {
 	}
 
 	// compare latest entry
-	lastSlotIndex := len(rf.status.Log) - 1
+	lastSlotIndex := rf.status.lastIndex()
 	lastSlotTerm := rf.status.Log[lastSlotIndex].Term
 
-	//log.Printf("%d receive vote, service index is %d,term is %d,vote Id is %d ,index is %d,term is %d",
+	//log.Printf("%d receive vote, service Index is %d,term is %d,vote Id is %d ,Index is %d,term is %d",
 	//	rf.me, lastSlotIndex, lastSlotTerm, voteArgs.Id, voteArgs.LastSlotIndex, voteArgs.LastSlotTerm)
 
 	if lastSlotTerm > voteArgs.LastSlotTerm ||
-		(lastSlotTerm == voteArgs.LastSlotTerm && lastSlotIndex > int(voteArgs.LastSlotIndex)) {
-		//log.Printf("%d last slot CurrentTerm  is %d, last index is %d "+
-		//	"later than vote's CurrentTerm %d, index %d reject vote",
+		(lastSlotTerm == voteArgs.LastSlotTerm && lastSlotIndex > voteArgs.LastSlotIndex) {
+		//log.Printf("%d last slot CurrentTerm  is %d, last Index is %d "+
+		//	"later than vote's CurrentTerm %d, Index %d reject vote",
 		//	rf.me, lastSlotTerm, lastSlotIndex, voteArgs.LastSlotTerm, voteArgs.LastSlotIndex)
 		reply.Result = voteReplyLatestLogEntryIsNotUpdateToMe
 		return

@@ -13,17 +13,56 @@ type Status struct {
 	VoteFor     map[Term]int
 }
 
-func (s *Status) getTerm(index Index) Term {
-	return s.Log[index].Term
+//return Log index  if match
+func (s *Status) logContain(index Index, term Term) bool {
+	return len(s.Log) > int(index) && s.Log[index].Term == term
 }
 
+func (s *Status) lastIndex() Index {
+	return s.Log[len(s.Log)-1].Index
+}
 func (s *Status) lastEntry() Entry {
 	return s.Log[len(s.Log)-1]
 }
 
+func (s *Status) lastEntryContainsOperation() (Entry, bool) {
+	for i := len(s.Log) - 1; i >= 0; i-- {
+		if !s.Log[i].IsHeatBeat {
+			return s.Log[i], true
+		}
+	}
+	return Entry{}, false
+}
+
+func (s *Status) getEntry(index Index) (Entry, int, bool) {
+	if len(s.Log) == 0 {
+		return Entry{}, 0, false
+	}
+	position := int(index) - int(s.Log[0].Index)
+	if position >= len(s.Log) {
+		return Entry{}, 0, false
+	}
+	return s.Log[position], position, true
+}
+
+func (s *Status) deleteAfter(position int) {
+	s.Log = s.Log[:position]
+}
+func (s *Status) append(entries []Entry) {
+	s.Log = append(s.Log, entries...)
+}
+
+func (s *Status) getTerm(index Index) Term {
+	return s.Log[index].Term
+}
+
+//func (s *Status) lastEntry() Entry {
+//	return s.Log[len(s.Log)-1]
+//}
+
 func NewStatus() Status {
 	res := Status{0, []Entry{}, make(map[Term]int)}
-	res.Log = append(res.Log, newEmptyEntry(0))
+	res.Log = append(res.Log, newEmptyEntry(0, 0))
 	return res
 }
 
@@ -34,22 +73,20 @@ type Entry struct {
 	Index      Index
 }
 
-func newEmptyEntry(term Term) Entry {
-	return Entry{term, true, Command{}, -1}
+func newEmptyEntry(term Term, index Index) Entry {
+	return Entry{term, true, Command{}, index}
 }
 
 //todo empty Command
 type Command struct {
-	Content interface{}
+	Operation interface{}
+	//the tester need the command Index
+	Index int
 }
 
 type PeerStatus struct {
 	nextIndex  Index
 	matchIndex Index
-}
-
-func (rf *Raft) newPeerStatus() PeerStatus {
-	return PeerStatus{nextIndex: Index(len(rf.status.Log)), matchIndex: 0}
 }
 
 type StartReply struct {

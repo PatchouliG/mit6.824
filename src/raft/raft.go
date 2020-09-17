@@ -7,7 +7,7 @@ package raft
 //
 // rf = Make(...)
 //   create a new Raft server.
-// rf.Start(Command interface{}) (index, CurrentTerm, isleader)
+// rf.Start(Command interface{}) (Index, CurrentTerm, isleader)
 //   start agreement on a new Log entry
 // rf.GetState() (CurrentTerm, leaderStatus)
 //   ask a Raft for its current CurrentTerm, and whether it thinks it is leader
@@ -97,7 +97,7 @@ type Raft struct {
 	appendEntryReply    chan AppendEntryReply
 	voteReplyChan       chan RequestVoteReply
 	voteRequestChan     chan RequestVoteArgs
-	startRequestChan    chan Command
+	startRequestChan    chan interface{}
 	// todo
 	startReplyChan chan StartReply
 
@@ -107,10 +107,6 @@ type Raft struct {
 	leaderStatus   bool
 	committeeIndex Index
 	lastApply      Index
-	nextApplyIndex int
-
-	// only leader use
-	nextCommandIndex Index
 
 	rand *rand.Rand
 }
@@ -304,9 +300,9 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	}
 
 	// Your code here (2B).
-	rf.startRequestChan <- Command{command}
+	rf.startRequestChan <- command
 	reply := <-rf.startReplyChan
-	//log.Printf("%d receive start command, return term %d ,index %d", rf.me, reply.Term, reply.Index)
+	//log.Printf("%d receive start command, return term %d ,Index %d", rf.me, reply.Term, reply.Index)
 
 	return reply.Index, reply.Term, isLeader
 }
@@ -357,7 +353,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.voteReplyChan = make(chan RequestVoteReply)
 	rf.voteRequestChan = make(chan RequestVoteArgs)
 	rf.peerStatusMap = make(map[int]PeerStatus)
-	rf.startRequestChan = make(chan Command)
+	rf.startRequestChan = make(chan interface{})
 	rf.startReplyChan = make(chan StartReply)
 	rf.leaderStatus = false
 	rf.committeeIndex = 0

@@ -84,9 +84,8 @@ func (rf *Raft) candidateHandelTimeout(successChan chan RequestVoteReply) {
 
 func (rf *Raft) sendVoteRequest(successChan chan RequestVoteReply) {
 	voteArgs := RequestVoteArgs{rf.status.CurrentTerm,
-		Index(len(rf.status.Log) - 1),
-		rf.status.Log[len(rf.status.Log)-1].Term,
-		rf.me}
+		rf.status.lastIndex(),
+		rf.status.lastEntry().Term, rf.me}
 	for id := range rf.peers {
 		if id == rf.me {
 			continue
